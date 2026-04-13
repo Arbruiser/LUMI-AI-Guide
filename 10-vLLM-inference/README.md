@@ -6,27 +6,32 @@ We will submit a batch job that starts a vLLM server with Qwen3-Code-Next, and w
 This chapter uses `lumi-multitorch` container which includes vLLM that is optimised for running on LUMI. Note, the vLLM version may not be the absolute latest release as it takes time for our team to optimise and test the container.
 
 ## Why vLLM?
-vLLM is the recommended and most popular choice for an LLM engine choice primarily due to two innovations:
+vLLM is the recommended and most popular LLM engine choice primarily due to two innovations:
 - **PagedAttention**: Efficiently manages KV cache memory, allowing for much larger batch sizes, which leads to higher throughput and longer context windows.
 - **Continuous Batching**: Reduces latency by processing new requests as soon as old ones finish, rather than waiting for an entire batch to complete.
 
 ### Understanding throughput
 **Throughput** is the rate at which the model can process and generate tokens. Performance is split into two distinct stages, each bound by different hardware limits: 
 - **Prefill (Compute bound)**: The model processes the entire input prompt (and history) in parallel. Since the GPU handles all input tokens at once, the bottleneck is the hardware's raw mathematical throughput (FLOPs). Prefill throughput is how many **input** tokens the model can be **processing**.
-- **Decode (Memory bandwidth bound)**: Tokens are generated one by one. For every single token produced, the GPU must reload all the model's weights from VRAM to GPU's compute cores. This makes performance dependent on Memory Bandwidth - how fast data can move - rather than how fast the GPU can calculate. Decode throughput is how many **ouput** tokens the model can be **generating**.
+- **Decode (Memory bandwidth bound)**: Tokens are generated one by one. For every single token produced, the GPU must reload all the model's weights from VRAM to GPU's compute cores. This makes performance dependent on Memory Bandwidth - how fast data can move - rather than how fast the GPU can calculate. Decode throughput is how many **output** tokens the model can be **generating**.
 
 ## Inference workflows:
-We cover two primary ways to interact with models:
-| Workflow              | Description                                                          | VRAM & Loading Behavior                                                                                                          | Best for...                                                                 |
-|-----------------------|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| Server-Client Mode    | Deploys vLLM as an OpenAI-compatible API server using a Unix socket. | Load Once, Run Many: Weights are loaded into VRAM when the server starts and stay there until the Slurm job ends.                | Interactive testing, troubleshooting prompts, or building a chat interface. |
-| Offline (Python) Mode | Uses the LLM class directly within a Python script to process data.  | Load, Process, Exit: Weights are loaded into VRAM, all prompts are processed in a single high-speed burst, then VRAM is cleared. | High-throughput batch jobs, benchmarking, and processing static files.      |
+There are two ways to interact with the models:
+| Workflow                  | Description                                                          | VRAM & Loading Behavior                                                                                                          | Best for...                                                                 |
+|---------------------------|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| **Server-Client Mode**    | Deploys vLLM as an OpenAI-compatible API server using a Unix socket. | Load Once, Run Many: Weights are loaded into VRAM when the server starts and stay there until the Slurm job ends.                | Interactive testing, troubleshooting prompts, or building a chat interface. |
+| **Offline (Python) Mode** | Uses the LLM class directly within a Python script to process data.  | Load, Process, Exit: Weights are loaded into VRAM, all prompts are processed in a single high-speed burst, then VRAM is cleared. | High-throughput batch jobs, benchmarking, and processing static files.      |
 
+> **Note.** It is important to distinguish between two different types of data movement:
+> - Initialization (Disk → VRAM): Model weights move from the parallel file system into the GPU memory. This happens once at startup and takes several minutes. The weights must fit entirely in VRAM (assuming no offloading) and they stay there as long as the model is running.
+> - Inference (VRAM → GPU Cores): During the Decode stage, the GPU must reload the model weights from VRAM into the compute cores for every single token generated.
 
 We provide three example Python scripts for running LLM inference on LUMI using the `lumi-multitorch` container.
 
 ## Start the vLLM server
-`run-vllm-lumi4.sh` sets the correct environment variables and runs the model. Instead of hosting the server on a node's port, the script creates a socket file that acts as a gateway into the server that only you can access. This avoids potential problems with hosting it directly on the compute node's port such as the port being occupied by another user, and restricts access to the model to only you (and possibly the other person who has a job on the same node). 
+The `run-vllm-lumi4.sh` script handles the environment setup and launches the model. Instead of hosting the server on a node's port, the script creates a **Unix Domain Socket** rather than a network port. 
+- **No Port Collisions**: If your job is assigned a node where another user is occupying the same port, it will fail for you. Sockets use a file path, which is unique to your job.
+- **Security**: The socket acts as a private gateway, removing the need for an API key. Access is restricted to your user session on that specific node, preventing other LUMI users from using your model instance.
 
 
 ## Use the model
