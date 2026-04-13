@@ -23,7 +23,7 @@ export TORCH_COMPILE_DISABLE=1
 
 
 # --- 2. Model & Socket Configuration ---
-MODEL_NAME="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+MODEL_NAME="Qwen/Qwen3-Coder-Next"
 SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 
 
