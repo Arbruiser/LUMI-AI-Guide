@@ -22,6 +22,7 @@ There are two ways to interact with the models:
 | **Server-Client Mode**    | Deploys vLLM as an OpenAI-compatible API server using a Unix socket. | Load Once, Run Many: Weights are loaded into VRAM when the server starts and stay there until the Slurm job ends.                | Interactive testing, troubleshooting prompts, or building a chat interface. |
 | **Offline (Python) Mode** | Uses the LLM class directly within a Python script to process data.  | Load, Process, Exit: Weights are loaded into VRAM, all prompts are processed in a single high-speed burst, then VRAM is cleared. | High-throughput batch jobs, benchmarking, and processing static files.      |
 
+
 > **Note.** It is important to distinguish between two different types of data movement:
 > - Initialization (Disk → VRAM): Model weights move from the parallel file system into the GPU memory. This happens once at startup and takes several minutes. The weights must fit entirely in VRAM (assuming no offloading) and they stay there as long as the model is running.
 > - Inference (VRAM → GPU Cores): During the Decode stage, the GPU must reload the model weights from VRAM into the compute cores for every single token generated.
@@ -29,10 +30,31 @@ There are two ways to interact with the models:
 We provide three example Python scripts for running LLM inference on LUMI using the `lumi-multitorch` container.
 
 ## Start the vLLM server
-The `run-vllm-lumi4.sh` script handles the environment setup and launches the model. Instead of hosting the server on a node's port, the script creates a **Unix Domain Socket** rather than a network port. 
-- **No Port Collisions**: If your job is assigned a node where another user is occupying the same port, it will fail for you. Sockets use a file path, which is unique to your job.
-- **Security**: The socket acts as a private gateway, removing the need for an API key. Access is restricted to your user session on that specific node, preventing other LUMI users from using your model instance.
+The `run-vllm-lumi4.sh` script handles the environment setup and launches the model. 
 
+### Configuration highlights
+- **Storage Redirection:** LLM weights can exceed hundreds of gigabytes, far surpassing the 20GB limit of the default `home` directory. To handle this, the script sets the `HF_HOME` environment variable to your project’s `/scratch/` directory;
+- **Private Communication:** Instead of hosting the server on a standard network port, the script creates a **Unix Domain Socket** (.sock file). There are two benefits of this approach:
+    - **No Port Collisions:** It avoids the common "Address already in use" error that occurs if another user is using the same port on a shared node.
+    - **Enhanced Security:** The socket acts as a private gateway, removing the need for an API key. Access is restricted to your user session on that specific node, preventing other LUMI users from using your model instance.
+
+### The execution command
+The core of the script is the `srun` command, which launches the `lumi-multitorch` container and initializes the server:
+``` bash
+srun singularity exec \
+    --bind $TMPDIR \
+    --env HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES \
+    $CONTAINER_IMAGE \
+    vllm serve $MODEL_NAME \
+    --tensor-parallel-size $SLURM_GPUS_ON_NODE \
+    --uds $SOCKET_FILE \
+    --load-format runai_streamer
+``` 
+**Flags explained:**
+- `vllm serve $MODEL_NAME` is the heart of the command that starts our vLLM server;
+- `--tensor-parallel-size` tells vLLM how many GPUs to split the model across. We set this to $SLURM_GPUS_ON_NODE so it automatically matches our #SBATCH request.
+- `--uds $SOCKET_FILE`: This enables the Unix Domain Socket we discussed earlier.
+- `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
 
 ## Use the model
 ### 1. Interactive Chat (Server-Client Mode)

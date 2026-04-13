@@ -21,6 +21,8 @@ export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/hf-cache/
 # Torch compilation currently fails in the container, so we disable it here.
 export TORCH_COMPILE_DISABLE=1
 
+# Make sure vLLM only only sees the specific GPUs Slurm has allocacted for us
+export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
 
 # --- 2. Model & Socket Configuration ---
 MODEL_NAME="Qwen/Qwen3-Coder-Next"
@@ -30,7 +32,6 @@ SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 # --- 3. Execution ---
 srun singularity exec \
     --bind $TMPDIR \
-    --env HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES \
     $CONTAINER_IMAGE \
     vllm serve $MODEL_NAME \
     --tensor-parallel-size $SLURM_GPUS_ON_NODE \
