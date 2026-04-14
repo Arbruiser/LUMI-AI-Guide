@@ -68,7 +68,7 @@ srun singularity exec \
 - `--tensor-parallel-size` tells vLLM how many GPUs to split the model across. We set this to $SLURM_GPUS_ON_NODE so it automatically matches our #SBATCH request.
 - `--uds $SOCKET_FILE`: This enables the Unix Domain Socket we discussed earlier.
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
-> [WARNING!]
+> [!WARNING]
 > **Note to self**: I either need to provide more detailed explanations like this about the Python scripts, or I need to remove these detailed explanations
 
 ## Step 2: Interact with the server
