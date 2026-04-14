@@ -31,9 +31,9 @@ There are two ways to interact with the models:
 
 ## The example scripts
 In this chapter, we use three distinct Python scripts to demonstrate different ways of interacting with the model:
-    - `chat_with_LLM.py`: An interactive script that enables back-and-forth dialogue with the model, including chat history.
-    - `batched_inference_from_server.py`: send hundreds of prompts simultaneously to a running vLLM server for fast dataset processing or benchmarking.
-    - `batched_inference_from_Python.py`: start vLLM directly in Python to load the model for fast dataset processing or benchmarking.
+- `chat_with_LLM.py`: An interactive script that enables back-and-forth dialogue with the model, including chat history.
+- `batched_inference_from_server.py`: send hundreds of prompts simultaneously to a running vLLM server for fast dataset processing or benchmarking.
+- `batched_inference_from_Python.py`: start vLLM directly in Python to load the model for fast dataset processing or benchmarking.
 
 ## Workflow A: Server-Client Mode
 Use this if you want to keep the model loaded and interact with it multiple times.
