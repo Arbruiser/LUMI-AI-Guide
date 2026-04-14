@@ -93,8 +93,8 @@ Interacting with a running vLLM server requires you to be on the same compute no
     singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-latest.sif \
     python chat_with_LLM.py "Qwen/Qwen3-Coder-Next"
     ```
-    > [!TIP]
-    > Type 'exit' to stop.
+> [!TIP]
+> Type 'exit' to stop.
 
     - **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
     ```bash
