@@ -19,22 +19,29 @@ vLLM is the recommended and most popular LLM engine choice primarily due to two 
 There are two ways to interact with the models:
 | Workflow                  | Description                                                          | VRAM & Loading Behavior                                                                                                          | Best for...                                                                 |
 |---------------------------|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| **Server-Client Mode**    | Deploys vLLM as an OpenAI-compatible API server using a Unix socket. | Load Once, Run Many: Weights are loaded into VRAM when the server starts and stay there until the Slurm job ends.                | Interactive testing, troubleshooting prompts, or building a chat interface. |
+| **Server-Client Mode**    | Deploys vLLM as an OpenAI-compatible API server using a Unix socket. | Load Once, Run Many: Weights are loaded into VRAM when the server starts and stay there until the Slurm job ends.                | Interactive testing, checking the model's 'vibe', troubleshooting, or building a chat interface. |
 | **Offline (Python) Mode** | Uses the LLM class directly within a Python script to process data.  | Load, Process, Exit: Weights are loaded into VRAM, all prompts are processed in a single high-speed burst, then VRAM is cleared. | High-throughput batch jobs, benchmarking, and processing static files.      |
 
 
-> [!NOTE] 
+> [!TIP]
 > It is important to distinguish between two different types of data movement:
 > - Initialization (Disk → VRAM): Model weights move from the parallel file system into the GPU memory. This happens once at startup and takes several minutes. The weights must fit entirely in VRAM (assuming no offloading) and they stay there as long as the model is running.
 > - Inference (VRAM → GPU Cores): During the Decode stage, the GPU must reload the model weights from VRAM into the compute cores for every single token generated.
 
-We provide three example Python scripts for running LLM inference on LUMI using the `lumi-multitorch` container.
 
-## Start the vLLM server
-The `run-vllm-lumi4.sh` script asks Slurm for resources and handles the environment setup and launches the model. Run:
+## The example scripts
+In this chapter, we use three distinct Python scripts to demonstrate different ways of interacting with the model:
+    - `chat_with_LLM.py`: An interactive script that enables back-and-forth dialogue with the model, including chat history.
+    - `batched_inference_from_server.py`: send hundreds of prompts simultaneously to a running vLLM server for fast dataset processing or benchmarking.
+    - `batched_inference_from_Python.py`: start vLLM directly in Python to load the model for fast dataset processing or benchmarking.
+
+## Workflow A: Server-Client Mode
+Use this if you want to keep the model loaded and interact with it multiple times.
+
+### Step 1: Start the vLLM server
+The `run-vllm-lumi4.sh` script asks Slurm for resources, handles the environment setup and launches the model. Update your project ID and submit:
 
 ``` bash
-# Make sure you have edited the project ID in the script first!
 sbatch run-vllm-lumi4.sh
 ```
 
@@ -61,51 +68,45 @@ srun singularity exec \
 - `--tensor-parallel-size` tells vLLM how many GPUs to split the model across. We set this to $SLURM_GPUS_ON_NODE so it automatically matches our #SBATCH request.
 - `--uds $SOCKET_FILE`: This enables the Unix Domain Socket we discussed earlier.
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
+> [WARNING!]
+> **Note to self**: I either need to provide more detailed explanations like this about the Python scripts, or I need to remove these detailed explanations
 
-## Use the model
-Interacting with a running vLLM server requires you to be on the same compute node where the server (and its socket file) exists. We do this by 'jumping into' the comput node's shell, a technique called **overlapping**.
+## Step 2: Interact with the server
+Interacting with a running vLLM server requires you to be on the same compute node where the server (and its socket file) exists. We do this by 'jumping into' the compute node's shell, which is called **overlapping**.
 
-### 1. Interactive Chat (Server-Client Mode)
-Start a vLLM server and start a chat (with history) with the LLM. 
-
-1.  **Start the vLLM server.** (Make sure to update your billing project first)
-    ```bash
-    sbatch run-vllm-lumi4.sh
-    ```
-2.  **Connect to the compute node's shell.** Find your job ID with `squeue --me`, then overlap into the allocated node as soon as the job is running:
+1.  **Enter the compute node's shell:** 
+    Find your job ID with `squeue --me`. As soon as your job status is `R` (Running), overlap into the allocated node as soon as the job is running:
     ```bash
     srun --overlap --jobid <slurm-job-id> --pty bash
     ```
-3. **Wait a few minutes for the model to load.** Monitor progress with `tail -f slurm-<job-id>.out`.
-    The model has been loaded when you see a line similar to:
-   ```bash
-   (APIServer pid=8379) INFO: Application startup complete.
-   ```
 
-5.  **Launch the chat script.**
+2. **Monitor the startup:** 
+    Loading models into VRAM takes time. Check the logs and wait for the "Application startup complete" message:
     ```bash
-    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-latest.sif \
-    python chat_with_LLM.py "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+    `tail -f slurm-<job-id>.out`.
     ```
-    Type 'exit' to stop.
 
----
-
-### 2. Batched Inference with the server
-Send a large volume of prompts from `prompts.txt` to the vLLM server, 256 at a time. 
-
-1.  **Start the server and connect to the node:** (follow steps 1-3 from the Chat mode above).
-2.  **Run the batch script:**
+3.  **Launch a client script.**
+    Now you can run either the interactive chat or the batched-API script:
+    - **Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
     ```bash
     singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-latest.sif \
-    python offline_batched_inference_from_server.py "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+    python chat_with_LLM.py "Qwen/Qwen3-Coder-Next"
+    ```
+    > [!TIP]
+    > Type 'exit' to stop.
+
+    - **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
+    ```bash
+    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-latest.sif \
+    python batched_inference_from_server.py "Qwen/Qwen3-Coder-Next"
     ```
     *The results will be saved to `results.json`.*
 
 ---
 
-### 3. **Python** Batch Inference
-Get resources with _salloc_ and run batched inference directly in Python. Use this method for high-throughput and simplicity. 
+## Workflow B: Offline Python Mode
+Get resources with _salloc_ and run batched inference directly in Python. Use this method for high-throughput batch processing where you don't need a persistent server. This approach is "one-and-done": it requests resources, processes your list, and exits.
 
 1.  **Request an interactive GPU allocation:**
     ```bash
@@ -115,23 +116,36 @@ Get resources with _salloc_ and run batched inference directly in Python. Use th
     ```bash
     srun --overlap --jobid <slurm-job-id> --pty bash
     ```
-3.  **Set required environment variables:** (enter your project ID)
+3.  **Set required environment variables:**
     ```bash
     export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
     export TORCH_COMPILE_DISABLE=1
     export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/$USER/hf-cache
     ```
-
 4.  **Run the script**:
     ```bash
     singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-latest.sif \
-    python offline_batched_inference_from_Python.py "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+    python batched_inference_from_Python.py "Qwen/Qwen3-Coder-Next"
     ```
 
 
---- 
-### Explaining how context works
-### Throughput with sequential requests vs batches
-### Pictures? 
-### Some KV cache and VRAM explanations? 
-### Benchmarking? Online and offline?
+---
+
+## Deep dive: how things work
+### 1. How "Memory" (Context) works
+If you look at `chat_with_LLM.py`, you will notice a list called `messages`. It is a common misconception that LLMs "remember" conversations naturally. In reality, LLMs are stateless, they treat every request as a brand new interaction, and it's the client's job to provide the 'memory'.
+    **The cost of context**: As the conversation grows longer, the "Prefill" stage takes longer and consumes more VRAM (to store the KV Cache). While Paged Attention makes this memory usage much more efficient, it doesn't make it free.
+    **Client-side management**: In our example, the memory is managed by the Python script. If you stop the script and restart it, the "memory" is cleared, even if the vLLM server is still running.
+
+### 2. Throughput: Sequential vs. Batched
+Why do we use asyncio and semaphores in `batched_inference_with_server.py`?
+    - Sequential (Slow): If you send one prompt, wait for the answer, and then send the next, you don't utilise the full batching power of vLLM and your GPU sits almost idle.
+    - Batched (Fast): By sending 256 prompts at once, vLLM’s **Continuous Batching** kicks in. While one request is in the "Decode" stage (generating a token), another can be in the "Prefill" stage. This saturates the GPU's memory bandwidth and drastically increases the number of tokens generated per second.
+
+> [!TIP]
+> If you want to see this in action, try running Script 2 with a semaphore of 1 (sequential) vs 256 (batched). This will only send one prompt at a time to the model, wait for the model's complete response, and only then send the next prompt. 
+
+### Content ideas:
+- Pictures with multimodal LLMs? 
+- Some KV cache explanations? 
+- vLLMs built-in benchmarking with explanation of what results mean?
