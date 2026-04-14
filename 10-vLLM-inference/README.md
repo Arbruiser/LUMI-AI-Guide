@@ -1,13 +1,13 @@
 # LLM inference
-This chapter describes how to perform Large Language Model (LLM) inference on LUMI using vLLM. vLLM is a popular and memory-efficient inference engine for hosting LLMs. Read more about vLLM [here](https://docs.vllm.ai/en/latest/).  
+This chapter describes how to perform Large Language Model (LLM) inference on LUMI using vLLM. [vLLM](https://docs.vllm.ai/en/latest/) is a popular and memory-efficient inference engine for hosting LLMs.  
 
-We will submit a batch job that starts a vLLM server with Qwen3-Code-Next, and we will run three Python scripts for interacting with and using the model.
+In this chapter, we will submit a batch job that starts a vLLM server with Qwen3-Code-Next, and we will run three Python scripts for interacting with and using the model.
 
 This chapter uses `lumi-multitorch` container which includes vLLM that is optimised for running on LUMI. Note, the vLLM version may not be the absolute latest release as it takes time for our team to optimise and test the container.
 
 ## Why vLLM?
 vLLM is the recommended and most popular LLM engine choice primarily due to two innovations:
-- **PagedAttention**: Efficiently manages KV cache memory, allowing for much larger batch sizes, which leads to higher throughput and longer context windows.
+- **Paged Attention**: Efficiently manages KV cache memory, allowing for much larger batch sizes, which leads to higher throughput and longer context windows.
 - **Continuous Batching**: Reduces latency by processing new requests as soon as old ones finish, rather than waiting for an entire batch to complete.
 
 ### Understanding throughput
@@ -23,14 +23,20 @@ There are two ways to interact with the models:
 | **Offline (Python) Mode** | Uses the LLM class directly within a Python script to process data.  | Load, Process, Exit: Weights are loaded into VRAM, all prompts are processed in a single high-speed burst, then VRAM is cleared. | High-throughput batch jobs, benchmarking, and processing static files.      |
 
 
-> **Note.** It is important to distinguish between two different types of data movement:
+> [!NOTE] 
+> It is important to distinguish between two different types of data movement:
 > - Initialization (Disk → VRAM): Model weights move from the parallel file system into the GPU memory. This happens once at startup and takes several minutes. The weights must fit entirely in VRAM (assuming no offloading) and they stay there as long as the model is running.
 > - Inference (VRAM → GPU Cores): During the Decode stage, the GPU must reload the model weights from VRAM into the compute cores for every single token generated.
 
 We provide three example Python scripts for running LLM inference on LUMI using the `lumi-multitorch` container.
 
 ## Start the vLLM server
-The `run-vllm-lumi4.sh` script handles the environment setup and launches the model. 
+The `run-vllm-lumi4.sh` script asks Slurm for resources and handles the environment setup and launches the model. Run:
+
+``` bash
+# Make sure you have edited the project ID in the script first!
+sbatch run-vllm-lumi4.sh
+```
 
 ### Configuration highlights
 - **Storage Redirection:** LLM weights can exceed hundreds of gigabytes, far surpassing the 20GB limit of the default `home` directory. To handle this, the script sets the `HF_HOME` environment variable to your project’s `/scratch/` directory;
@@ -57,6 +63,8 @@ srun singularity exec \
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
 
 ## Use the model
+Interacting with a running vLLM server requires you to be on the same compute node where the server (and its socket file) exists. We do this by 'jumping into' the comput node's shell, a technique called **overlapping**.
+
 ### 1. Interactive Chat (Server-Client Mode)
 Start a vLLM server and start a chat (with history) with the LLM. 
 
@@ -64,7 +72,7 @@ Start a vLLM server and start a chat (with history) with the LLM.
     ```bash
     sbatch run-vllm-lumi4.sh
     ```
-2.  **Connect to the compute node's shell.** Find your job ID with `squeue --me`, then "overlap" into the allocated node as soon as the job is running:
+2.  **Connect to the compute node's shell.** Find your job ID with `squeue --me`, then overlap into the allocated node as soon as the job is running:
     ```bash
     srun --overlap --jobid <slurm-job-id> --pty bash
     ```
