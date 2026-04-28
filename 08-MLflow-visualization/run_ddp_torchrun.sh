@@ -9,6 +9,10 @@
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 31fce52 (renamed the directories and main README to include leading zeroes for the references to the first 9 chapters (no references or paths in any of the scripts))
 # this module facilitates the use of LUMI AIF singularity containers on LUMI
 module purge
 module use /appl/local/laifs/modules
@@ -27,4 +31,9 @@ mkdir -p "$TORCH_HOME"
 # choose container
 SIF=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
 
+<<<<<<< HEAD
 srun singularity run $SIF bash -c 'python -m torch.distributed.run --standalone --nnodes=1 --nproc_per_node=8 mlflow_ddp_visiontransformer.py'
+=======
+# need to create sqsh file with mlflow included
+srun singularity run $SIF bash -c 'python -m torch.distributed.run --standalone --nnodes=1 --nproc_per_node=8 wandb_ddp_visiontransformer.py'
+>>>>>>> 31fce52 (renamed the directories and main README to include leading zeroes for the references to the first 9 chapters (no references or paths in any of the scripts))
