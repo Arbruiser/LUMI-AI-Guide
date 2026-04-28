@@ -21,16 +21,17 @@ export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/hf-cache/
 # Torch compilation currently fails in the container, so we disable it here.
 export TORCH_COMPILE_DISABLE=1
 
+# Make sure vLLM only only sees the specific GPUs Slurm has allocacted for us
+export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
 
 # --- 2. Model & Socket Configuration ---
-MODEL_NAME="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+MODEL_NAME="deepseek-ai/DeepSeek-V3.2"
 SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 
 
 # --- 3. Execution ---
 singularity exec \
     --bind $TMPDIR \
-    --env HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES \
     $CONTAINER_IMAGE \
     vllm bench throughput \
     --model $MODEL_NAME \

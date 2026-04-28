@@ -25,7 +25,7 @@ export TORCH_COMPILE_DISABLE=1
 export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
 
 # --- 2. Model & Socket Configuration ---
-MODEL_NAME="Qwen/Qwen3-Coder-Next"
+MODEL_NAME="deepseek-ai/DeepSeek-V3.2"
 SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 
 
