@@ -27,7 +27,7 @@ In this chapter, we use three distinct Python scripts to demonstrate different w
 Use this if you want to keep the model loaded and interact with it multiple times.
 
 ### Step 1: Start the vLLM server
-The `run-vllm-lumi4.sh` script asks Slurm for resources, handles the environment setup and launches the model. Update your project ID and submit:
+The `run-vllm-lumi4.sh` script asks Slurm for resources (2 GPUs for 2h, 14 CPU cores and 120GB of RAM), handles the environment setup and launches the model. Update your project ID and submit:
 
 ``` bash
 sbatch run-vllm-lumi4.sh
@@ -95,25 +95,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
     ```
     *The results will be saved to `results.json`.*
 
-- **Option 3: Batched API Inference.** To understand how many tokens per second your setup can handle, you can run an "online benchmark." This sends a burst of requests to your running server and measures throughput and latency. While inside your overlap shell (Step 2), run the following command:
-```bash
-singularity exec 
-    --bind $TMPDIR $CONTAINER_IMAGE \
-    vllm bench serve \
-    --backend openai \
-    --uds $SOCKET_FILE \
-    --model "Qwen/Qwen3.6-35B-A3B" \
-    --dataset-name sharegpt \
-    --num-prompts 1000
-```
-Key parameters:
-- `--dataset-name sharegpt`: This uses a standard dataset of real-world human/LLM conversations.
-- `--request-rate inf`: This sends all prompts as fast as possible to find the absolute "breaking point" (peak throughput) of your GPU configuration.
-More documentation available in the vLLM [documentation](https://docs.vllm.ai/en/latest/benchmarking/cli/).
-
 ---
-> [!WARNING]
-> TO BE FIXED:
 
 ## Workflow B: Offline Python Mode
 Get resources with _salloc_ and run batched inference directly in Python. Use this method for high-throughput batch processing where you don't need a persistent server. This approach is "one-and-done": it requests resources, processes your list, and exits. Since this is a 'offline / from Python' approach, we do not need to start a server with `sbatch run-vllm-lumi4.sh`.
@@ -138,6 +120,11 @@ Get resources with _salloc_ and run batched inference directly in Python. Use th
     python batched_inference_from_Python.py "Qwen/Qwen3.6-35B-A3B"
     ```
 
+- **Run an offline throughput test.** To understand how many tokens per second your setup can handle, you can run an "offline benchmark." This sends a burst of requests to vLLM and measures input and output throughput. Run the following script:
+```bash
+sbatch test-throughput-lumi4.sh
+```
+... Where we run prompts from `--dataset-name sharegpt` dataset of real-world human/LLM conversations through the model and measure performance.
 
 ---
 

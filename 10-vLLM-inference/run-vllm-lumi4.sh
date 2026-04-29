@@ -3,10 +3,10 @@
 #SBATCH -p dev-g
 #SBATCH --time 2:00:00
 #SBATCH --tasks-per-node 1
-#SBATCH --cpus-per-task=28
-#SBATCH --gpus-per-node 4
+#SBATCH --cpus-per-task=14
+#SBATCH --gpus-per-node 2
 #SBATCH --nodes 1
-#SBATCH --mem 240G
+#SBATCH --mem 120G
 
 
 # --- 1. Environment Setup ---
