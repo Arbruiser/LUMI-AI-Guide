@@ -11,7 +11,7 @@
 
 # --- 1. Environment Setup ---
 # We use the PyTorch container provided by the LUMI AI Factory Services, which contains vLLM.
-export CONTAINER_IMAGE=/appl/local/laifs/containers/lumi-multitorch-latest.sif
+export CONTAINER_IMAGE=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
 module use /appl/local/laifs/modules
 module load lumi-aif-singularity-bindings
 
@@ -25,7 +25,7 @@ export TORCH_COMPILE_DISABLE=1
 export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
 
 # --- 2. Model & Socket Configuration ---
-MODEL_NAME="deepseek-ai/DeepSeek-V3.2"
+MODEL_NAME="google/gemma-4-31B-it"
 SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 
 

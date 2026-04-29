@@ -1,9 +1,9 @@
 # LLM inference
 This chapter describes how to perform Large Language Model (LLM) inference on LUMI using vLLM. [vLLM](https://docs.vllm.ai/en/latest/) is a popular and memory-efficient inference engine for hosting LLMs.  
 
-In this chapter, we will submit a batch job that starts a vLLM server with deepseek-ai/DeepSeek-V3.2, and we will run three Python scripts for interacting with and using the model.
+In this chapter, we will submit a batch job that starts a vLLM server with `gemma-4-31B-it`, and we will run three Python scripts for interacting with and using the model.
 
-This chapter uses `lumi-multitorch` container which includes vLLM that is optimised for running on LUMI. Note, the vLLM version may not be the absolute latest release as it takes time for our team to optimise and test the container.
+This chapter uses a persistent `lumi-multitorch-20260415` container which includes vLLM that is optimised for running on LUMI. Note, the vLLM version may not be the absolute latest release as it takes time for our team to optimise and test the container.
 
 ## Why vLLM?
 vLLM is the recommended and most popular LLM engine choice primarily due to two innovations:
@@ -32,21 +32,21 @@ The `run-vllm-lumi4.sh` script asks Slurm for resources, handles the environment
 ``` bash
 sbatch run-vllm-lumi4.sh
 ```
-> [!WARNING]
-> **Lukas's feedback**: "it'd be good to briefly go through the things that the run-vllm-lumi4.sh does (loading modules, set required env vars (and why they are needed), the model and number of nodes it sets up). Not in great depth, just so that the user doesn't need to go check out the file immediately at that point. So basically expanding what you have in the configuration highlights a bit"
 
-### Configuration highlights
+### What the launch script does
+- **AI bindings:** We load `lumi-aif-singularity-bindings` to give LUMI containers access to the file system of the working directory.
 - **Storage Redirection:** LLM weights can exceed hundreds of gigabytes, far surpassing the 20GB limit of the default `home` directory. To handle this, the script sets the `HF_HOME` environment variable to your project’s `/scratch/` directory;
+- **Disable PyTorch compilation:** `TORCH_COMPILE_DISABLE=1` as it currently fails in the container. 
+- **GPU masking:** We set `HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES` so that vLLM only sees the GPUs that 'belong' to us and not try to use other GPUs on the node.
 - **Private Communication:** Instead of hosting the server on a standard network port, the script creates a **Unix Domain Socket** (.sock file). There are two benefits of this approach:
     - **No Port Collisions:** It avoids the common "Address already in use" error that occurs if another user is using the same port on a shared node.
-    - **Enhanced Security:** The socket acts as a private gateway, removing the need for an API key. Access is restricted to your user session on that specific node, preventing other LUMI users from using your model instance.
+    - **Enhanced Security:** The socket acts as a private gateway, removing the need for an API key. Access is restricted by file permissions and being on the same node (where only people with a job on that node can join), preventing other LUMI users from using your model instance.
 
-### The execution command
-The core of the script is the `srun` command, which launches the `lumi-multitorch` container and initializes the server:
+#### The execution command
+The core of the script is the `srun` command, which launches the `lumi-multitorch-20260415` container and initializes the server:
 ``` bash
 srun singularity exec \
     --bind $TMPDIR \
-    --env HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES \
     $CONTAINER_IMAGE \
     vllm serve $MODEL_NAME \
     --tensor-parallel-size $SLURM_GPUS_ON_NODE \
@@ -58,8 +58,6 @@ srun singularity exec \
 - `--tensor-parallel-size` tells vLLM how many GPUs to split the model across. We set this to $SLURM_GPUS_ON_NODE so it automatically matches our #SBATCH request.
 - `--uds $SOCKET_FILE`: This enables the Unix Domain Socket we discussed earlier.
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
-> [!WARNING]
-> **Note to self**: I either need to provide more detailed explanations like this about the Python scripts, or I need to remove these detailed explanations
 
 ## Step 2: Interact with the server
 Interacting with a running vLLM server requires you to be on the same compute node where the server (and its socket file) exists. We do this by 'jumping into' the compute node's shell, which is called **overlapping**.
@@ -78,25 +76,47 @@ Interacting with a running vLLM server requires you to be on the same compute no
 
 3.  **Launch a client script.**
     Now you can run either the interactive chat or the batched-API script:
-    - **Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
+- **Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
     ```bash
-    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-latest.sif \
-    python chat_with_LLM.py "deepseek-ai/DeepSeek-V3.2"
+    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif \
+    python chat_with_LLM.py "google/gemma-4-31B-it"
     ```
 > [!TIP]
 > Type 'exit' to stop.
 
-    - **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
+> [!NOTE]
+> Why the `httpx` transport?
+> Standard LLM clients expect an `http://localhost:8000 `address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
+
+- **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
     ```bash
-    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-latest.sif \
-    python batched_inference_from_server.py "deepseek-ai/DeepSeek-V3.2"
+    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif \
+    python batched_inference_from_server.py "google/gemma-4-31B-it"
     ```
     *The results will be saved to `results.json`.*
 
+- **Option 3: Batched API Inference.** To understand how many tokens per second your setup can handle, you can run an "online benchmark." This sends a burst of requests to your running server and measures throughput and latency. While inside your overlap shell (Step 2), run the following command:
+```bash
+singularity exec 
+    --bind $TMPDIR $CONTAINER_IMAGE \
+    vllm bench serve \
+    --backend openai \
+    --uds $SOCKET_FILE \
+    --model "google/gemma-4-26b-it" \
+    --dataset-name sharegpt \
+    --num-prompts 1000
+```
+Key parameters:
+- `--dataset-name sharegpt`: This uses a standard dataset of real-world human/LLM conversations.
+- `--request-rate inf`: This sends all prompts as fast as possible to find the absolute "breaking point" (peak throughput) of your GPU configuration.
+More documentation available in the vLLM [documentation](https://docs.vllm.ai/en/latest/benchmarking/cli/).
+
 ---
+> [!WARNING]
+> TO BE FIXED:
 
 ## Workflow B: Offline Python Mode
-Get resources with _salloc_ and run batched inference directly in Python. Use this method for high-throughput batch processing where you don't need a persistent server. This approach is "one-and-done": it requests resources, processes your list, and exits.
+Get resources with _salloc_ and run batched inference directly in Python. Use this method for high-throughput batch processing where you don't need a persistent server. This approach is "one-and-done": it requests resources, processes your list, and exits. Since this is a 'offline / from Python' approach, we do not need to start a server with `sbatch run-vllm-lumi4.sh`.
 
 1.  **Request an interactive GPU allocation:**
     ```bash
@@ -114,8 +134,8 @@ Get resources with _salloc_ and run batched inference directly in Python. Use th
     ```
 4.  **Run the script**:
     ```bash
-    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-latest.sif \
-    python batched_inference_from_Python.py "deepseek-ai/DeepSeek-V3.2"
+    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif\
+    python batched_inference_from_Python.py "google/gemma-4-31B-it"
     ```
 
 
@@ -134,7 +154,7 @@ If you look at `chat_with_LLM.py`, you will notice a list called `messages`. It 
 
 ### 3. Understanding throughput
 **Throughput** is the rate at which the model can process and generate tokens. Performance is split into two distinct stages, each bound by different hardware limits: 
-- **Prefill (Compute bound)**: The model processes the entire input prompt (and history) in parallel. Since the GPU handles all input tokens at once, the bottleneck is the hardware's raw mathematical throughput (FLOPs). Prefill throughput is how many **input** tokens the model can be **processing**.
+- **Prefill (Compute bound)**: The model processes the entire input prompt (and history) in parallel. Since the GPU handles all input tokens at once, the bottleneck is the hardware's raw mathematical throughput (FLOPs).  Prefill throughput is how many **input** tokens the model can be **processing**.
 - **Decode (Memory bandwidth bound)**: Tokens are generated one by one. For every single token produced, the GPU must reload all the model's weights from VRAM to GPU's compute cores. This makes performance dependent on Memory Bandwidth - how fast data can move - rather than how fast the GPU can calculate. Decode throughput is how many **output** tokens the model can be **generating**.
 
 ### 4. Throughput: Sequential vs. Batched
