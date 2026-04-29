@@ -32,8 +32,10 @@ SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 # --- 3. Run offline benchmark ---
 srun singularity exec \
     --bind $TMPDIR \
-    $CONTAINER_IMAGE \ 
+    $CONTAINER_IMAGE \
     vllm bench throughput \
     --model $MODEL_NAME \
+    --tensor-parallel-size $SLURM_GPUS_ON_NODE \
     --dataset-name sharegpt \
-    --num-prompts 1000
+    --num-prompts 1000 \
+    --load-format runai_streamer
