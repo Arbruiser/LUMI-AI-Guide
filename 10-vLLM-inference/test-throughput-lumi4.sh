@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -A project_462000131
+#SBATCH -A project_XXXXXXXXX
 #SBATCH -p dev-g
 #SBATCH --time 2:00:00
 #SBATCH --tasks-per-node 1
@@ -11,7 +11,7 @@
 
 # --- 1. Environment Setup ---
 # We use the PyTorch container provided by the LUMI AI Factory Services, which contains vLLM.
-export CONTAINER_IMAGE=/appl/local/laifs/containers/lumi-multitorch-latest.sif
+export CONTAINER_IMAGE=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
 module use /appl/local/laifs/modules
 module load lumi-aif-singularity-bindings
 
@@ -25,16 +25,24 @@ export TORCH_COMPILE_DISABLE=1
 export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
 
 # --- 2. Model & Socket Configuration ---
-MODEL_NAME="deepseek-ai/DeepSeek-V3.2"
+MODEL_NAME="google/gemma-4-31B-it"
 SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 
 
-# --- 3. Execution ---
-singularity exec \
+# --- 3. Run online benchmark ---
+# Start the server
+srun singularity exec \
     --bind $TMPDIR \
-    $CONTAINER_IMAGE \
-    vllm bench throughput \
+    $CONTAINER_IMAGE \ 
+    vllm serve $MODEL_NAME
+
+# Run the benchmark on the server
+srun singularity exec \
+    --bind $TMPDIR \
+    $CONTAINER_IMAGE \ 
+    srun vllm bench serve \
+    --backend vllm \
     --model $MODEL_NAME \
+    --endpoint /v1/completions \
     --dataset-name sharegpt \
-    --tensor-parallel-size 4 \
-    --num-prompts 300
+    --num-prompts 1000
