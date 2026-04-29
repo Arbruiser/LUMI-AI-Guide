@@ -25,24 +25,15 @@ export TORCH_COMPILE_DISABLE=1
 export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
 
 # --- 2. Model & Socket Configuration ---
-MODEL_NAME="google/gemma-4-31B-it"
+MODEL_NAME="Qwen/Qwen3.6-35B-A3B"
 SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 
 
-# --- 3. Run online benchmark ---
-# Start the server
+# --- 3. Run offline benchmark ---
 srun singularity exec \
     --bind $TMPDIR \
     $CONTAINER_IMAGE \ 
-    vllm serve $MODEL_NAME
-
-# Run the benchmark on the server
-srun singularity exec \
-    --bind $TMPDIR \
-    $CONTAINER_IMAGE \ 
-    srun vllm bench serve \
-    --backend vllm \
+    vllm bench throughput \
     --model $MODEL_NAME \
-    --endpoint /v1/completions \
     --dataset-name sharegpt \
     --num-prompts 1000
