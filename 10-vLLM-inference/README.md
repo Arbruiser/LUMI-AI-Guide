@@ -1,7 +1,7 @@
 # LLM inference
 This chapter describes how to perform Large Language Model (LLM) inference on LUMI using vLLM. [vLLM](https://docs.vllm.ai/en/latest/) is a popular and memory-efficient inference engine for hosting LLMs.  
 
-In this chapter, we will submit a batch job that starts a vLLM server with `gemma-4-31B-it`, and we will run three Python scripts for interacting with and using the model.
+In this chapter, we will submit a batch job that starts a vLLM server with `Qwen3.6-35B-A3B`, and we will run three Python scripts for interacting with and using the model.
 
 This chapter uses a persistent `lumi-multitorch-20260415` container which includes vLLM that is optimised for running on LUMI. Note, the vLLM version may not be the absolute latest release as it takes time for our team to optimise and test the container.
 
@@ -79,7 +79,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
 - **Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
     ```bash
     singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif \
-    python chat_with_LLM.py "google/gemma-4-31B-it"
+    python chat_with_LLM.py "Qwen/Qwen3.6-35B-A3B"
     ```
 > [!TIP]
 > Type 'exit' to stop.
@@ -91,7 +91,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
 - **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
     ```bash
     singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif \
-    python batched_inference_from_server.py "google/gemma-4-31B-it"
+    python batched_inference_from_server.py "Qwen/Qwen3.6-35B-A3B"
     ```
     *The results will be saved to `results.json`.*
 
@@ -102,7 +102,7 @@ singularity exec
     vllm bench serve \
     --backend openai \
     --uds $SOCKET_FILE \
-    --model "google/gemma-4-26b-it" \
+    --model "Qwen/Qwen3.6-35B-A3B" \
     --dataset-name sharegpt \
     --num-prompts 1000
 ```
@@ -135,7 +135,7 @@ Get resources with _salloc_ and run batched inference directly in Python. Use th
 4.  **Run the script**:
     ```bash
     singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif\
-    python batched_inference_from_Python.py "google/gemma-4-31B-it"
+    python batched_inference_from_Python.py "Qwen/Qwen3.6-35B-A3B"
     ```
 
 
