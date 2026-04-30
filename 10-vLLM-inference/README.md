@@ -81,7 +81,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
 4.  **Launch a client script.**
     Now you can run either the interactive chat or the batched-API script:
 
-    - **OPTION 1: INTERACTIVE CHAT**  
+    - **OPTION 1: INTERACTIVE CHAT**<br>
       Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
       
       ```bash
@@ -90,13 +90,15 @@ Interacting with a running vLLM server requires you to be on the same compute no
       ```
       
       > [!TIP]
+      >
       > Type 'exit' to stop.
       
       > [!NOTE]
+      >
       > **Why the `httpx` transport?**
       > Standard LLM clients expect an `http://localhost:8000` address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
 
-    - **OPTION 2: BATCHED API INFERENCE**  
+    - **OPTION 2: BATCHED API INFERENCE**<br>
       Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
       
       ```bash
@@ -105,6 +107,8 @@ Interacting with a running vLLM server requires you to be on the same compute no
       ```
       
       *The results will be saved to `results.json`.*
+
+---
 
 ---
 
