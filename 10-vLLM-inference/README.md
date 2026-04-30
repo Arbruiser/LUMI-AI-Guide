@@ -81,7 +81,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
 4.  **Launch a client script.**
     Now you can run either the interactive chat or the batched-API script:
     
-- **Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
+#### **Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
     
     ```bash
     singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE \
@@ -95,7 +95,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
 > **Why the `httpx` transport?**
 > Standard LLM clients expect an `http://localhost:8000` address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
 
-- **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
+#### **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
     
     ```bash
     singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE \
