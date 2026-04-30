@@ -26,7 +26,6 @@ export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
 
 # --- 2. Model & Socket Configuration ---
 MODEL_NAME="Qwen/Qwen3.6-35B-A3B"
-SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 
 
 # --- 3. Run offline benchmark ---

@@ -27,17 +27,17 @@ In this chapter, we use three distinct Python scripts to demonstrate different w
 Use this if you want to keep the model loaded and interact with it multiple times.
 
 ### Step 1: Start the vLLM server
-The `run-vllm-lumi4.sh` script asks Slurm for resources (2 GPUs for 2h, 14 CPU cores and 120GB of RAM), handles the environment setup and launches the model. Update your project ID and submit:
+The `run-vllm-lumi2.sh` script asks Slurm for resources (2 GPUs for 2h, 14 CPU cores and 120GB of RAM), handles the environment setup and launches the model. Update your project ID and submit:
 
 ``` bash
-sbatch run-vllm-lumi4.sh
+sbatch run-vllm-lumi2.sh
 ```
 
 ### What the launch script does
 - **AI bindings:** We load `lumi-aif-singularity-bindings` to give LUMI containers access to the file system of the working directory.
 - **Storage Redirection:** LLM weights can exceed hundreds of gigabytes, far surpassing the 20GB limit of the default `home` directory. To handle this, the script sets the `HF_HOME` environment variable to your project’s `/scratch/` directory;
 - **Disable PyTorch compilation:** `TORCH_COMPILE_DISABLE=1` as it currently fails in the container. 
-- **GPU masking:** We set `HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES` so that vLLM only sees the GPUs that 'belong' to us and not try to use other GPUs on the node.
+- **GPU masking:** We set `HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES` so that vLLM only sees the GPUs allocated to our job and does not attempt to access other GPUs on the node.
 - **Private Communication:** Instead of hosting the server on a standard network port, the script creates a **Unix Domain Socket** (.sock file). There are two benefits of this approach:
     - **No Port Collisions:** It avoids the common "Address already in use" error that occurs if another user is using the same port on a shared node.
     - **Enhanced Security:** The socket acts as a private gateway, removing the need for an API key. Access is restricted by file permissions and being on the same node (where only people with a job on that node can join), preventing other LUMI users from using your model instance.
@@ -63,7 +63,7 @@ srun singularity exec \
 Interacting with a running vLLM server requires you to be on the same compute node where the server (and its socket file) exists. We do this by 'jumping into' the compute node's shell, which is called **overlapping**.
 
 1.  **Enter the compute node's shell:** 
-    Find your job ID with `squeue --me`. As soon as your job status is `R` (Running), overlap into the allocated node as soon as the job is running:
+    Find your job ID with `squeue --me`. As soon as your job status is `R` (Running), overlap into the allocated node:
     ```bash
     srun --overlap --jobid <slurm-job-id> --pty bash
     ```
@@ -71,81 +71,63 @@ Interacting with a running vLLM server requires you to be on the same compute no
 2. **Monitor the startup:** 
     Loading models into VRAM takes time. Check the logs and wait for the "Application startup complete" message:
     ```bash
-    `tail -f slurm-<job-id>.out`.
+    tail -f slurm-<job-id>.out
+    ```
+3. Save the long path to the container in `CONTAINER_IMAGE` variable:
+    ```bash
+    export CONTAINER_IMAGE=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
     ```
 
-3.  **Launch a client script.**
+4.  **Launch a client script.**
     Now you can run either the interactive chat or the batched-API script:
-- **Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
-    ```bash
-    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif \
-    python chat_with_LLM.py "Qwen/Qwen3.6-35B-A3B"
-    ```
-> [!TIP]
-> Type 'exit' to stop.
+    - **Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
+        ```bash
+        singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE \
+        python chat_with_LLM.py "Qwen/Qwen3.6-35B-A3B"
+        ```
+        > [!TIP]
+        > Type 'exit' to stop.
 
-> [!NOTE]
-> Why the `httpx` transport?
-> Standard LLM clients expect an `http://localhost:8000 `address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
+        > [!NOTE]
+        > Why the `httpx` transport?
+        > Standard LLM clients expect an `http://localhost:8000 `address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
 
-- **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
-    ```bash
-    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif \
-    python batched_inference_from_server.py "Qwen/Qwen3.6-35B-A3B"
-    ```
-    *The results will be saved to `results.json`.*
+    - **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
+        ```bash
+        singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE \
+        python batched_inference_from_server.py "Qwen/Qwen3.6-35B-A3B"
+        ```
+        *The results will be saved to `results.json`.*
 
 ---
 
 ## Workflow B: Offline Python Mode
-1. Start an interactive GPU session. Update your project ID and run this command to request resources and immediately enter the compute node shell:
+1. **Start an interactive GPU session.** Update your project ID and run this command to request resources and immediately enter the compute node shell:
     ```bash
     srun -p dev-g --nodes=1 --gpus-per-node=2 --ntasks-per-node=1 --cpus-per-task=14 --time=2:00:00 --account=project_XXXXXXXXX --pty bash
     ```
-2.  Set required environment variables:
+2.  **Set required environment variables:**
     ```bash
+    module use /appl/local/laifs/modules
+    module load lumi-aif-singularity-bindings
+
     export CONTAINER_IMAGE=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
     export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
     export TORCH_COMPILE_DISABLE=1
     export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/$USER/hf-cache
     ```
-3. And run the script:
+3. **Run the script:**
     ```bash
     singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE python batched_inference_from_Python.py "Qwen/Qwen3.6-35B-A3B"
-    ```
-
-> [!WARNING]
-> OLD stuff, to be removed:
-
-Get resources with _salloc_ and run batched inference directly in Python. Use this method for high-throughput batch processing where you don't need a persistent server. This approach is "one-and-done": it requests resources, processes your list, and exits. Since this is a 'offline / from Python' approach, we do not need to start a server with `sbatch run-vllm-lumi4.sh`.
-
-1.  **Request an interactive GPU allocation:**
-    ```bash
-    salloc -p dev-g --nodes=1 --gpus-per-node=8 --ntasks-per-node=1 --cpus-per-task=56 --time=2:00:00 --account=project_XXXXXXXXX
-    ```
-2.  **Enter the compute node:**
-    ```bash
-    srun --overlap --jobid <slurm-job-id> --pty bash
-    ```
-3.  **Set required environment variables:**
-    ```bash
-    export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
-    export TORCH_COMPILE_DISABLE=1
-    export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/$USER/hf-cache
-    ```
-4.  **Run the script**:
-    ```bash
-    singularity run -B /pfs,/scratch,/projappl /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif\
-    python batched_inference_from_Python.py "Qwen/Qwen3.6-35B-A3B"
     ```
 
 ### Run an offline throughput test.
 To understand how many tokens per second your setup can handle, you can run an offline benchmark. This sends a burst of requests to vLLM and measures the raw hardware input and output throughput without the overhead of an API server. Edit your project ID and run the following script:
 ```bash
-sbatch test-throughput-lumi4.sh
+sbatch test-throughput-lumi2.sh
 ```
 
-This script is identical to `run-vllm-lumi4.sh` with the exception of the following command:
+This script is identical to `run-vllm-lumi2.sh` with the exception of the following command:
 
 ```bash
 srun singularity exec \
@@ -173,8 +155,8 @@ It is important to distinguish between two different types of data movement:
 
 ### 2. How "Memory" (Context) works
 If you look at `chat_with_LLM.py`, you will notice a list called `messages`. It is a common misconception that LLMs "remember" conversations naturally. In reality, LLMs are stateless, they treat every request as a brand new interaction, and it's the client's job to provide the 'memory'.
-    **The cost of context**: As the conversation grows longer, the "Prefill" stage takes longer and consumes more VRAM (to store the KV Cache). While Paged Attention makes this memory usage much more efficient, it doesn't make it free.
-    **Client-side management**: In our example, the memory is managed by the Python script. If you stop the script and restart it, the "memory" is cleared, even if the vLLM server is still running.
+**The cost of context**: As the conversation grows longer, the "Prefill" stage takes longer and consumes more VRAM (to store the KV Cache). While Paged Attention makes this memory usage much more efficient, it doesn't make it free.
+**Client-side management**: In our example, the memory is managed by the Python script. If you stop the script and restart it, the "memory" is cleared, even if the vLLM server is still running.
 
 ### 3. Understanding throughput
 **Throughput** is the rate at which the model can process and generate tokens. Performance is split into two distinct stages, each bound by different hardware limits: 
@@ -182,9 +164,9 @@ If you look at `chat_with_LLM.py`, you will notice a list called `messages`. It 
 - **Decode (Memory bandwidth bound)**: Tokens are generated one by one. For every single token produced, the GPU must reload all the model's weights from VRAM to GPU's compute cores. This makes performance dependent on Memory Bandwidth - how fast data can move - rather than how fast the GPU can calculate. Decode throughput is how many **output** tokens the model can be **generating**.
 
 ### 4. Throughput: Sequential vs. Batched
-Why do we use asyncio and semaphores in `batched_inference_with_server.py`?
+Why do we use asyncio and semaphores in `batched_inference_from_server.py`?
 - Sequential (Slow): If you send one prompt, wait for the answer, and then send the next, you don't utilise the full batching power of vLLM and your GPU sits almost idle.
 - Batched (Fast): By sending 256 prompts at once, vLLM’s **Continuous Batching** kicks in. While one request is in the "Decode" stage (generating a token), another can be in the "Prefill" stage. This saturates the GPU's memory bandwidth and drastically increases the number of tokens generated per second.
 
 > [!TIP]
-> If you want to see this in action, try running offline batched inference with a semaphore of 1 (sequential) vs 256 (batched). This will only send one prompt at a time to the model, wait for the model's complete response, and only then send the next prompt. 
+> If you want to see this in action, try running online batched inference with a semaphore of 1 (sequential) vs 256 (batched). This will only send one prompt at a time to the model, wait for the model's complete response, and only then send the next prompt. 
