@@ -1,7 +1,7 @@
 # LLM inference
 This chapter describes how to perform Large Language Model (LLM) inference on LUMI using vLLM. [vLLM](https://docs.vllm.ai/en/latest/) is a popular and memory-efficient inference engine for hosting LLMs.  
 
-In this chapter, we will submit a batch job that starts a vLLM server with `Qwen3.6-35B-A3B`, and we will run three Python scripts for interacting with and using the model.
+In this chapter, we will submit a batch job that starts a vLLM server with [`Qwen3.6-35B-A3B`](https://huggingface.co/Qwen/Qwen3.6-35B-A3B), and we will run three Python scripts for interacting with and using the model.
 
 This chapter uses a persistent `lumi-multitorch-20260415` container which includes vLLM that is optimised for running on LUMI. Note, the vLLM version may not be the absolute latest release as it takes time for our team to optimise and test the container.
 
@@ -40,7 +40,7 @@ sbatch run-vllm-lumi2.sh
 - **GPU masking:** We set `HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES` so that vLLM only sees the GPUs allocated to our job and does not attempt to access other GPUs on the node.
 - **Private Communication:** Instead of hosting the server on a standard network port, the script creates a **Unix Domain Socket** (.sock file). There are two benefits of this approach:
     - **No Port Collisions:** It avoids the common "Address already in use" error that occurs if another user is using the same port on a shared node.
-    - **Enhanced Security:** The socket acts as a private gateway, removing the need for an API key. Access is restricted by file permissions and being on the same node (where only people with a job on that node can join), preventing other LUMI users from using your model instance.
+    - **Enhanced Security:** The socket acts as a private gateway, removing the need for an API key. Access is restricted by file permissions and being on the same node (since only users with a job allocation on that node can access it), preventing other LUMI users from using your model instance.
 
 #### The execution command
 The core of the script is the `srun` command, which launches the `lumi-multitorch-20260415` container and initializes the server:
@@ -153,8 +153,8 @@ It is important to distinguish between two different types of data movement:
 
 ### 2. How "Memory" (Context) works
 If you look at `chat_with_LLM.py`, you will notice a list called `messages`. It is a common misconception that LLMs "remember" conversations naturally. In reality, LLMs are stateless, they treat every request as a brand new interaction, and it's the client's job to provide the 'memory'.
-**The cost of context**: As the conversation grows longer, the "Prefill" stage takes longer and consumes more VRAM (to store the KV Cache). While Paged Attention makes this memory usage much more efficient, it doesn't make it free.
-**Client-side management**: In our example, the memory is managed by the Python script. If you stop the script and restart it, the "memory" is cleared, even if the vLLM server is still running.
+- **The cost of context**: As the conversation grows longer, the "Prefill" stage takes longer and consumes more VRAM (to store the KV Cache). While Paged Attention makes this memory usage much more efficient, it doesn't make it free.
+- **Client-side management**: In our example, the memory is managed by the Python script. If you stop the script and restart it, the "memory" is cleared, even if the vLLM server is still running.
 
 ### 3. Understanding throughput
 **Throughput** is the rate at which the model can process and generate tokens. Performance is split into two distinct stages, each bound by different hardware limits: 
