@@ -88,12 +88,12 @@ Interacting with a running vLLM server requires you to be on the same compute no
         python chat_with_LLM.py "Qwen/Qwen3.6-35B-A3B"
         ```
         
-        > [!TIP]
-        > Type 'exit' to stop.
-        
-        > [!NOTE]
-        > **Why the `httpx` transport?**
-        > Standard LLM clients expect an `http://localhost:8000` address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
+> [!TIP]
+> Type 'exit' to stop.
+
+> [!NOTE]
+> **Why the `httpx` transport?**
+> Standard LLM clients expect an `http://localhost:8000` address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
 
     - **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
         
