@@ -98,6 +98,25 @@ Interacting with a running vLLM server requires you to be on the same compute no
 ---
 
 ## Workflow B: Offline Python Mode
+1. Start an interactive GPU session. Update your project ID and run this command to request resources and immediately enter the compute node shell:
+    ```bash
+    srun -p dev-g --nodes=1 --gpus-per-node=2 --ntasks-per-node=1 --cpus-per-task=14 --time=2:00:00 --account=project_XXXXXXXXX --pty bash
+    ```
+2.  Set required environment variables:
+    ```bash
+    export CONTAINER_IMAGE=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
+    export HIP_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES
+    export TORCH_COMPILE_DISABLE=1
+    export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/$USER/hf-cache
+    ```
+3. And run the script:
+    ```bash
+    singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE python batched_inference_from_Python.py "Qwen/Qwen3.6-35B-A3B"
+    ```
+
+> [!WARNING]
+> OLD stuff, to be removed:
+
 Get resources with _salloc_ and run batched inference directly in Python. Use this method for high-throughput batch processing where you don't need a persistent server. This approach is "one-and-done": it requests resources, processes your list, and exits. Since this is a 'offline / from Python' approach, we do not need to start a server with `sbatch run-vllm-lumi4.sh`.
 
 1.  **Request an interactive GPU allocation:**
@@ -120,11 +139,29 @@ Get resources with _salloc_ and run batched inference directly in Python. Use th
     python batched_inference_from_Python.py "Qwen/Qwen3.6-35B-A3B"
     ```
 
-- **Run an offline throughput test.** To understand how many tokens per second your setup can handle, you can run an "offline benchmark." This sends a burst of requests to vLLM and measures input and output throughput. Run the following script:
+### Run an offline throughput test.
+To understand how many tokens per second your setup can handle, you can run an offline benchmark. This sends a burst of requests to vLLM and measures the raw hardware input and output throughput without the overhead of an API server. Edit your project ID and run the following script:
 ```bash
 sbatch test-throughput-lumi4.sh
 ```
-... Where we run prompts from `--dataset-name sharegpt` dataset of real-world human/LLM conversations through the model and measure performance.
+
+This script is identical to `run-vllm-lumi4.sh` with the exception of the following command:
+
+```bash
+srun singularity exec \
+    --bind $TMPDIR \
+    $CONTAINER_IMAGE \
+    vllm bench throughput \
+    --model $MODEL_NAME \
+    --tensor-parallel-size $SLURM_GPUS_ON_NODE \
+    --dataset-name sharegpt \
+    --num-prompts 2000 \
+    --load-format runai_streamer
+```
+**Flags explained:**
+- `vllm bench throughput` sets vLLM in 'benchmarking' mode.
+- `--dataset-name sharegpt` is the dataset of prompts from real-world human/LLM conversations that is run through the model.
+- `--num-prompts 2000` truncates the long dataset to 2000 entries. 
 
 ---
 
@@ -150,9 +187,4 @@ Why do we use asyncio and semaphores in `batched_inference_with_server.py`?
 - Batched (Fast): By sending 256 prompts at once, vLLM’s **Continuous Batching** kicks in. While one request is in the "Decode" stage (generating a token), another can be in the "Prefill" stage. This saturates the GPU's memory bandwidth and drastically increases the number of tokens generated per second.
 
 > [!TIP]
-> If you want to see this in action, try running Script 2 with a semaphore of 1 (sequential) vs 256 (batched). This will only send one prompt at a time to the model, wait for the model's complete response, and only then send the next prompt. 
-
-### Other content ideas:
-- Pictures with multimodal LLMs? 
-- Some KV cache explanations? 
-- vLLMs built-in benchmarking with explanation of what results mean?
+> If you want to see this in action, try running offline batched inference with a semaphore of 1 (sequential) vs 256 (batched). This will only send one prompt at a time to the model, wait for the model's complete response, and only then send the next prompt. 
