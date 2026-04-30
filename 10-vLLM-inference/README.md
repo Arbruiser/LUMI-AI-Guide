@@ -106,17 +106,6 @@ Interacting with a running vLLM server requires you to be on the same compute no
 
 ---
 
-#### **Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.
-    
-    ```bash
-    singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE \
-    python batched_inference_from_server.py "Qwen/Qwen3.6-35B-A3B"
-    ```
-    
-    *The results will be saved to `results.json`.*
-
----
-
 ## Workflow B: Offline Python Mode
 1. **Start an interactive GPU session.** Update your project ID and run this command to request resources and immediately enter the compute node shell:
     ```bash
