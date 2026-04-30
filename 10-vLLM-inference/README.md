@@ -81,14 +81,14 @@ Interacting with a running vLLM server requires you to be on the same compute no
 4.  **Launch a client script.**
     Now you can run either the interactive chat or the batched-API script:
 
-    #### **💬 Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
+    - **💬 Option 1: Interactive chat**. Best for having a back-and-forth conversation, quickly checking the model's "vibe", and output format.
         
         ```bash
         singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE \
         python chat_with_LLM.py "Qwen/Qwen3.6-35B-A3B"
         ```
 
-    #### **🚀 Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.     
+    - **🚀 Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.     
         ```bash
         singularity run -B /pfs,/scratch,/projappl $CONTAINER_IMAGE \
         python batched_inference_from_server.py "Qwen/Qwen3.6-35B-A3B"
