@@ -1,4 +1,4 @@
-# LUMI AI guide
+<h1 align="center"> LUMI AI guide </h1>
 
 <p align="center">
   <img src="assets/images/LUMI_logo.jpg" alt="LUMI Logo"/>
