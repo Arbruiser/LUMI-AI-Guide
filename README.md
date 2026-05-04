@@ -1,4 +1,8 @@
-# LUMI AI guide
+<h1 align="center"> LUMI AI guide </h1>
+
+<p align="center">
+  <img src="assets/images/LUMI_logo.jpg" alt="LUMI Logo"/>
+</p>
 
 This guide is designed to assist users in migrating their machine learning applications from smaller-scale computing environments to the LUMI supercomputer. We will walk you through a detailed example of training an image classification model using [PyTorch's Vision Transformer (VIT)](https://pytorch.org/vision/main/models/vision_transformer.html) on the [ImageNet dataset](https://www.image-net.org/).
 
@@ -37,10 +41,10 @@ The guide is structured into the following sections:
 
 - [LUMI Documentation](https://docs.lumi-supercomputer.eu/)
 - [LUMI AI Factory Services](https://docs.lumi-supercomputer.eu/software/local/lumi-aif/)
-- [LUMI software library, PyTorch](https://lumi-supercomputer.github.io/LUMI-EasyBuild-docs/p/PyTorch/)
+- [LUMI AI software environment, PyTorch](https://docs.lumi-supercomputer.eu/laif/software/ai-environment/)
 - [LUMI software library, TensorFlow](https://lumi-supercomputer.github.io/LUMI-EasyBuild-docs/t/TensorFlow/)
 - [LUMI software library, Jax](https://lumi-supercomputer.github.io/LUMI-EasyBuild-docs/j/jax/)
-- [Workshop material - Moving your AI training jobs to LUMI](https://lumi-supercomputer.github.io/LUMI-training-materials/ai-20240529/)
+- [Workshop material - Moving your AI training jobs to LUMI](https://lumi-supercomputer.github.io/AI-latest)
 
 ### Primary contributors
 The primary contributors to this repository are the [LUMI User Support Team (LUST)](https://lumi-supercomputer.eu/user-support/need-help/
