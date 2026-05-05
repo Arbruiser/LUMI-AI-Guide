@@ -7,10 +7,8 @@ import os
 from openai import AsyncOpenAI
 from tqdm.asyncio import tqdm
 
-sem=asyncio.Semaphore(256) # how many requests to send at a time
-
 # 1. Function to send requests asynchronously
-async def get_response(model_name, client, user_prompt):
+async def get_response(model_name, client, user_prompt, sem):
     async with sem:
         try:
             response = await client.chat.completions.create(
@@ -48,15 +46,16 @@ async def main():
         prompts = [line.strip() for line in f if line.strip()]
 
     # 4. Automatically find the socket file
-    socket_path = f"/tmp/vllm-{os.environ.get("SLURM_JOB_ID")}.sock"
+    socket_path = f"/tmp/vllm-{os.environ.get('SLURM_JOB_ID')}.sock"
 
     if not os.path.exists(socket_path):
         print(f"Error: Socket not found at {socket_path}")
         sys.exit(1)
 
     transport = httpx.AsyncHTTPTransport(uds=socket_path)
-    
+
     # 5. Connect to the socket and create a 'task' for every prompt
+    sem=asyncio.Semaphore(256) # Set many requests to send to the vLLM server at a time
     async with httpx.AsyncClient(transport=transport) as http_client:
         client = AsyncOpenAI(
             base_url="http://localhost/v1", 
@@ -66,7 +65,7 @@ async def main():
 
         print(f"--- Sending {len(prompts)} prompts ---")
 
-        tasks = [get_response(args.MODEL, client, p) for p in prompts]
+        tasks = [get_response(args.MODEL, client, p, sem) for p in prompts]
         
         # asyncio.gather waits for all tasks to finish
         results = await tqdm.gather(*tasks, desc="Inference Progress")
@@ -78,4 +77,9 @@ async def main():
     print(f"Done! Processed {len(results)} prompts.")
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nInference cancelled by user.")
+        sys.exit(0)

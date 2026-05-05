@@ -5,10 +5,10 @@ import argparse
 import torch
 from vllm import LLM, SamplingParams
 
-# 1. Define your system prompt here
-SYSTEM_PROMPT = "You are a helpful and concise AI assistant."
-
 def main():
+    # 1. Define your system prompt here
+    SYSTEM_PROMPT = "You are a helpful and concise AI assistant."
+
     # 2. Parse the model name
     parser = argparse.ArgumentParser()
     parser.add_argument("MODEL", type=str)
@@ -34,9 +34,10 @@ def main():
     # 5. Initialize the LLM
     llm = LLM(
         model=args.MODEL,
-        tensor_parallel_size=torch.cuda.device_count()
+        tensor_parallel_size=torch.cuda.device_count(),
+        load_format="runai_streamer"
         )
-    sampling_params = SamplingParams(temperature=0.6, max_tokens=2000)
+    sampling_params = SamplingParams(temperature=0.6, max_tokens=5000)
 
     # 6. Run batched inference
     outputs = llm.chat(conversations, sampling_params=sampling_params, use_tqdm=True)
@@ -58,4 +59,8 @@ def main():
     print(f"Done! Processed {len(results)} prompts.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nInference cancelled by user.")
+        sys.exit(0)
