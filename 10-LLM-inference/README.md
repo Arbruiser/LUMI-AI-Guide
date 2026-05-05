@@ -136,7 +136,7 @@ To understand how many tokens per second your setup can handle, you can run an o
 sbatch test-throughput-lumi2.sh
 ```
 
-This script is identical to `run-vllm-lumi2.sh` with the exception of the following command:
+This script is mostly identical to `run-vllm-lumi2.sh`. The main difference lies in the following command:
 
 ```bash
 srun singularity exec \
@@ -146,13 +146,13 @@ srun singularity exec \
     --model $MODEL_NAME \
     --tensor-parallel-size $SLURM_GPUS_ON_NODE \
     --dataset-name sharegpt \
-    --num-prompts 2000 \
+    --num-prompts 100 \
     --load-format runai_streamer
 ```
 **Flags explained:**
 - `vllm bench throughput` sets vLLM in 'benchmarking' mode.
 - `--dataset-name sharegpt` is the dataset of prompts from real-world human/LLM conversations that is run through the model.
-- `--num-prompts 2000` truncates the long dataset to 2000 entries. 
+- `--num-prompts 100` truncates the long dataset to 100 entries. 
 
 ---
 

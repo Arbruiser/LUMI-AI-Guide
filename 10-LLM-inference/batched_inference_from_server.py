@@ -42,7 +42,7 @@ async def main():
     if not os.path.exists("prompts.txt"):
         print("Error: 'prompts.txt' not found.")
         sys.exit(1)
-    with open("prompts.txt", "r", encoding="utf-8") as f: # 
+    with open("prompts.txt", "r", encoding="utf-8") as f:
         prompts = [line.strip() for line in f if line.strip()]
 
     # 4. Automatically find the socket file
@@ -55,7 +55,7 @@ async def main():
     transport = httpx.AsyncHTTPTransport(uds=socket_path)
 
     # 5. Connect to the socket and create a 'task' for every prompt
-    sem=asyncio.Semaphore(256) # Set many requests to send to the vLLM server at a time
+    sem=asyncio.Semaphore(32) # Set many requests to send to the vLLM server at a time
     async with httpx.AsyncClient(transport=transport) as http_client:
         client = AsyncOpenAI(
             base_url="http://localhost/v1", 
@@ -63,10 +63,12 @@ async def main():
             http_client=http_client
         )
 
+        prompts = prompts[:100] # truncate the number of prompts to 100
+
         print(f"--- Sending {len(prompts)} prompts ---")
 
         tasks = [get_response(args.MODEL, client, p, sem) for p in prompts]
-        
+
         # asyncio.gather waits for all tasks to finish
         results = await tqdm.gather(*tasks, desc="Inference Progress")
 
