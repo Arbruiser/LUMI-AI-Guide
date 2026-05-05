@@ -36,7 +36,7 @@ sbatch run-vllm-lumi2.sh
 ### What the launch script does
 - **MIOpen Cache Redirection:** We redirect the cache of MIOpen (AMD's library of deep-learning primitives) to a temporary directory to avoid collisions with other users on the same node. 
 - **AI bindings:** We load `lumi-aif-singularity-bindings` to give LUMI containers access to the file system of the working directory.
-- **Storage Redirection:** LLM weights can exceed hundreds of gigabytes, far surpassing the 20GB limit of the default `home` directory. To handle this, the script sets the `HF_HOME` environment variable to your project’s `/scratch/` directory;
+- **Storage Redirection:** LLM weights can exceed hundreds of gigabytes, far surpassing the 20GB limit of the default `home` directory. To handle this, the script sets the `HF_HOME` environment variable to your project’s `/scratch/` directory.
 - **Private Communication:** Instead of hosting the server on a standard network port, the script creates a **Unix Domain Socket** (.sock file). There are two benefits of this approach:
     - **No Port Collisions:** It avoids the common "Address already in use" error that occurs if another user is using the same port on a shared node.
     - **Enhanced Security:** The socket acts as a private gateway, removing the need for an API key. Access is restricted by file permissions and being on the same node (since only users with a job allocation on that node can access it), preventing other LUMI users from using your model instance.
@@ -55,7 +55,7 @@ srun singularity exec \
     --load-format runai_streamer
 ``` 
 **Flags explained:**
-- `vllm serve $MODEL_NAME` is the heart of the command that starts our vLLM server;
+- `vllm serve $MODEL_NAME` is the heart of the command that starts our vLLM server.
 - `--tensor-parallel-size` tells vLLM across how many GPUs to split the model. We set this to $SLURM_GPUS_ON_NODE so it automatically matches our #SBATCH request.
 - `--uds $SOCKET_FILE`: This enables the Unix Domain Socket we discussed earlier.
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
@@ -64,7 +64,7 @@ srun singularity exec \
 To run an LLM, the model must fit entirely in VRAM. The memory required for model weights depends on the number of parameters and the precision at which they are stored.
 
 As a rule of thumb, at half precision (BF16/FP16), you need 2GB of VRAM per 1b parameters plus 20% overhead for KV cache and CUDA/ROCm overhead. For [`Qwen3.6-35B-A3B`](https://huggingface.co/Qwen/Qwen3.6-35B-A3B):
-- **Weights:** $35\text{B parameters} \times 2\text{ bytes} = 70\text{GB}$. Note that for [Mixture-of-Experts (MoE)](https://huggingface.co/blog/moe-transformers) models, all the weights are loaded in VRAM, even though only a fraction (3B in case of [`Qwen3.6-35B-A3B`](https://huggingface.co/Qwen/Qwen3.6-35B-A3B)) is active at a time.
+- **Weights:** $35\text{B parameters} \times 2\text{ bytes} = 70\text{GB}$. Note that for [Mixture-of-Experts (MoE)](https://huggingface.co/blog/moe-transformers) models, all the weights are loaded in VRAM, even though only a fraction (3B in our case) is active at a time.
 - **KV Cache & Overhead:** Adding the 20% buffer brings the total to $\approx 84\text{GB}$. Keep in mind that longer context size requires significantly more VRAM for KV cache.
 
 Since a single LUMI GPU (GCD) has 64GB, one is not enough and we use 2 GPUs (128GB total). For a detailed breakdown of different models and [quantisation](https://bentoml.com/llm/model-preparation/llm-quantization) levels, you can use [this VRAM calculator](https://apxml.com/tools/vram-calculator).
