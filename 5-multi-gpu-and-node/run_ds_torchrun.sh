@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=8
 #SBATCH --time=1:00:00
-
+#SBATCH --output=slurm-%x-%j.out
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G
@@ -19,13 +19,16 @@ MIOPEN_DIR=$(mktemp -d)
 export MIOPEN_CUSTOM_CACHE_DIR=$MIOPEN_DIR/cache
 export MIOPEN_USER_DB=$MIOPEN_DIR/config
 
+# Set your TORCH_HOME cache to scratch to avoid saving to home directory
+# https://docs.pytorch.org/docs/2.11/hub.html#where-are-my-downloaded-models-saved
+export TORCH_HOME="/scratch/${SLURM_JOB_ACCOUNT}/${USER}/torch_home"
+mkdir -p "$TORCH_HOME"
+
 # choose container
-SIF=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif
+SIF=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
 
 export MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 export MASTER_PORT="1${SLURM_JOB_ID:0-4}" # set port based on SLURM_JOB_ID to avoid conflicts
 
-export SINGULARITYENV_PREPEND_PATH=/user-software/bin # gives access to packages inside the container
-
-srun singularity run -B ../resources/ai-guide-env.sqsh:/user-software:image-src=/ \
+srun singularity run \
 	$SIF bash -c 'python -m torch.distributed.run --nproc_per_node 8 --nnodes $SLURM_NNODES --node_rank $SLURM_PROCID --master_addr $MASTER_ADDR --master_port $MASTER_PORT ds_visiontransformer.py --deepspeed --deepspeed_config ds_config.json'
