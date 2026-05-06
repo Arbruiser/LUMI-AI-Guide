@@ -47,7 +47,6 @@ For a deeper dive into the performance and security benefits of Unix Domain Sock
 The core of the script is the `srun` command, which launches the container and initialises the server:
 ``` bash
 srun singularity exec \
-    --bind $TMPDIR \
     $SIF \
     vllm serve $MODEL_NAME \
     --tensor-parallel-size $SLURM_GPUS_ON_NODE \
@@ -140,7 +139,6 @@ This script is mostly identical to `run-vllm-lumi2.sh`. The main difference lies
 
 ```bash
 srun singularity exec \
-    --bind $TMPDIR \
     $SIF \
     vllm bench throughput \
     --model $MODEL_NAME \
