@@ -17,8 +17,7 @@ async def get_response(model_name, client, user_prompt, sem):
                     {"role": "system", "content": "You are a helpful and concise AI assistant."},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_completion_tokens=2000,
-                temperature=0.6,
+                max_completion_tokens=5000
             )
             return {
                 "prompt": user_prompt,

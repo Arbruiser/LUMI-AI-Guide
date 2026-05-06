@@ -46,8 +46,8 @@ def main():
         response = client.chat.completions.create(
             model=args.MODEL,
             messages=messages, # Sends the full history
-            max_completion_tokens=2000, # Max length of the LLM's output
-            temperature=0.6, # Higher = more creative, lower = more focused
+            #max_completion_tokens=5000, # Uncomment to set the max length of the LLM's output
+            #temperature=0.6, # Uncomment to adjust temperature. Higher = more creative, lower = more focused
             stream=True # Sends tokens as soon as the model generates them
         )
 
