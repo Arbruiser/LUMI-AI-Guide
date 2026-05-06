@@ -32,7 +32,7 @@ SOCKET_FILE=$TMPDIR/vllm-$SLURM_JOB_ID.sock
 
 
 # --- 3. Start vLLM server ---
-srun singularity exec \
+srun singularity run \
     $SIF \
     vllm serve $MODEL_NAME \
     --tensor-parallel-size $SLURM_GPUS_ON_NODE \

@@ -29,7 +29,7 @@ MODEL_NAME="Qwen/Qwen3.6-35B-A3B"
 
 
 # --- 3. Run offline benchmark ---
-srun singularity exec \
+srun singularity run \
     $SIF \
     vllm bench throughput \
     --model $MODEL_NAME \

@@ -46,7 +46,7 @@ For a deeper dive into the performance and security benefits of Unix Domain Sock
 #### The execution command
 The core of the script is the `srun` command, which launches the container and initialises the server:
 ``` bash
-srun singularity exec \
+srun singularity run \
     $SIF \
     vllm serve $MODEL_NAME \
     --tensor-parallel-size $SLURM_GPUS_ON_NODE \
@@ -56,7 +56,7 @@ srun singularity exec \
 **Flags explained:**
 - `vllm serve $MODEL_NAME` is the heart of the command that starts our vLLM server.
 - `--tensor-parallel-size` tells vLLM across how many GPUs to split the model. We set this to $SLURM_GPUS_ON_NODE so it automatically matches our #SBATCH request.
-- `--uds $SOCKET_FILE`: This enables the Unix Domain Socket we discussed earlier.
+- `--uds $SOCKET_FILE`: This creates the Unix Domain Socket we discussed earlier and connects the vLLM server to it.
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
 
 #### Note on the hardware requirements
@@ -138,7 +138,7 @@ sbatch test-throughput-lumi2.sh
 This script is mostly identical to `run-vllm-lumi2.sh`. The main difference lies in the following command:
 
 ```bash
-srun singularity exec \
+srun singularity run \
     $SIF \
     vllm bench throughput \
     --model $MODEL_NAME \
