@@ -4,7 +4,6 @@
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=8
 #SBATCH --time=1:00:00
-
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=56
 #SBATCH --mem=480G

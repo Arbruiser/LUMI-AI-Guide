@@ -17,8 +17,12 @@ MIOPEN_DIR=$(mktemp -d)
 export MIOPEN_CUSTOM_CACHE_DIR=$MIOPEN_DIR/cache
 export MIOPEN_USER_DB=$MIOPEN_DIR/config
 
-# choose container
-SIF=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif
+# Set your TORCH_HOME cache to scratch to avoid saving to home directory
+# https://docs.pytorch.org/docs/2.11/hub.html#where-are-my-downloaded-models-saved
+export TORCH_HOME="/scratch/${SLURM_JOB_ACCOUNT}/${USER}/torch_home"
+mkdir -p "$TORCH_HOME"
 
-export SINGULARITYENV_PREPEND_PATH=/user-software/bin # gives access to packages inside the container
-singularity run -B ../resources/ai-guide-env.sqsh:/user-software:image-src=/ $SIF bash -c 'python visiontransformer.py'
+# choose container
+SIF=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
+
+singularity run $SIF bash -c 'python visiontransformer.py'
