@@ -121,7 +121,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
     module load lumi-aif-singularity-bindings
 
     export SIF=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
-    export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/$USER/hf-cache
+    export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/hf-cache/
     ```
 3. **Run the script:**
     ```bash
@@ -131,7 +131,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
 ---
 
 ## Run an offline throughput test
-To understand how many tokens per second your setup can handle, you can run an offline benchmark. This sends a burst of requests to vLLM and measures the raw hardware input and output throughput without the overhead of an API server. This throughput test is a standalone job independent of the workflows above. Edit your project ID and run the following script:
+To understand how many tokens per second your setup can handle, you can run an offline benchmark. This sends a burst of requests to vLLM and measures the raw hardware input and output throughput without the overhead of an API server or data serialisation/deserialisation. This throughput test is a standalone job independent of the workflows above. Edit your project ID and run the following script:
 ```bash
 sbatch test-throughput-lumi2.sh
 ```
@@ -146,7 +146,7 @@ srun singularity exec \
     --model $MODEL_NAME \
     --tensor-parallel-size $SLURM_GPUS_ON_NODE \
     --dataset-name sharegpt \
-    --num-prompts 100 \
+    --num-prompts 1000 \
     --load-format runai_streamer
 ```
 **Flags explained:**

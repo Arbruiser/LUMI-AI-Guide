@@ -36,5 +36,5 @@ srun singularity exec \
     --model $MODEL_NAME \
     --tensor-parallel-size $SLURM_GPUS_ON_NODE \
     --dataset-name sharegpt \
-    --num-prompts 100 \
+    --num-prompts 1000 \
     --load-format runai_streamer

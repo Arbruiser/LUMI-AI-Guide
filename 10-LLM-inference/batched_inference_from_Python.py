@@ -21,6 +21,8 @@ def main():
     with open("prompts.txt", "r", encoding="utf-8") as f:
         prompts = [line.strip() for line in f if line.strip()]
 
+        prompts = prompts[:300] # truncate the number of prompts to 300
+
     # 4.Format into the "Chat" structure (List of Lists of Dicts)
     # Every conversation in the batch gets the same system prompt
     conversations = [
@@ -37,7 +39,7 @@ def main():
         tensor_parallel_size=torch.cuda.device_count(),
         load_format="runai_streamer"
         )
-    sampling_params = SamplingParams(temperature=0.6, max_tokens=5000)
+    sampling_params = SamplingParams(max_tokens=5000)
 
     # 6. Run batched inference
     outputs = llm.chat(conversations, sampling_params=sampling_params, use_tqdm=True)

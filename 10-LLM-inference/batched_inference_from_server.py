@@ -44,6 +44,8 @@ async def main():
     with open("prompts.txt", "r", encoding="utf-8") as f:
         prompts = [line.strip() for line in f if line.strip()]
 
+        prompts = prompts[:300] # truncate the number of prompts to 300
+
     # 4. Automatically find the socket file
     socket_path = f"/tmp/vllm-{os.environ.get('SLURM_JOB_ID')}.sock"
 
@@ -54,15 +56,13 @@ async def main():
     transport = httpx.AsyncHTTPTransport(uds=socket_path)
 
     # 5. Connect to the socket and create a 'task' for every prompt
-    sem=asyncio.Semaphore(32) # Set many requests to send to the vLLM server at a time
+    sem=asyncio.Semaphore(256) # Set how many requests to send to the vLLM server at a time
     async with httpx.AsyncClient(transport=transport) as http_client:
         client = AsyncOpenAI(
             base_url="http://localhost/v1", 
             api_key="token-ignored",
             http_client=http_client
         )
-
-        prompts = prompts[:100] # truncate the number of prompts to 100
 
         print(f"--- Sending {len(prompts)} prompts ---")
 
