@@ -7,7 +7,7 @@ This chapter uses a persistent `lumi-multitorch-full-u24r70f21m50t210-20260415_1
 
 ## Why vLLM?
 vLLM is the recommended and most popular LLM engine choice primarily due to two innovations:
-- **Paged Attention:** Efficiently manages KV cache memory, allowing for much larger batch sizes, higher throughput and longer context windows.
+- **Paged Attention:** Efficiently manages KV (Key-Value) cache memory, allowing for much larger batch sizes, higher throughput and longer context windows.
 - **Continuous Batching:** Reduces latency by processing new requests as soon as old ones finish, rather than waiting for an entire batch to complete.
 
 ## Inference workflows:
@@ -26,12 +26,14 @@ In this chapter, we use three distinct Python scripts to demonstrate different w
 ## Workflow A: Server-Client Mode
 Use this if you want to keep the model loaded and interact with it multiple times.
 
-### Step 1: Start the vLLM server
-The [`run-vllm-lumi2.sh`](run-vllm-lumi2.sh) script asks Slurm for resources (2 GPUs for 2h, 14 CPU cores and 120GB of RAM), handles the environment setup and launches the model. Update your project ID and submit:
+## Step 1: Start the vLLM server
+The [`run-vllm-lumi2.sh`](run-vllm-lumi2.sh) script asks Slurm for resources (2 GCDs for 2h, 14 CPU cores and 120GB of RAM), handles the environment setup and launches the model. Update your project ID and submit:
 
 ``` bash
 sbatch run-vllm-lumi2.sh
 ```
+
+Remember: on LUMI, one physical AMD MI250X GPU consists of two GCDs (Graphics Compute Dies), each having 64GB of VRAM. In Slurm, when you request `--gpus-per-node=2`, you are actually requesting 2 GCDs, which effectively is one GPU.
 
 ### What the launch script does
 - **MIOpen Cache Redirection:** We redirect the cache of MIOpen (AMD's library of deep-learning primitives) to a temporary directory to avoid collisions with other users on the same node. 
@@ -55,7 +57,7 @@ srun singularity run \
 ``` 
 **Flags explained:**
 - `vllm serve $MODEL_NAME` is the heart of the command that starts our vLLM server.
-- `--tensor-parallel-size` tells vLLM across how many GPUs to split the model. We set this to $SLURM_GPUS_ON_NODE so it automatically matches our #SBATCH request.
+- `--tensor-parallel-size` tells vLLM across how many GCDs to split the model. We set this to $SLURM_GPUS_ON_NODE so it automatically matches our #SBATCH request.
 - `--uds $SOCKET_FILE`: This creates the Unix Domain Socket we discussed earlier and connects the vLLM server to it.
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
 
@@ -63,10 +65,10 @@ srun singularity run \
 To run an LLM, the model must fit entirely in VRAM. The memory required for model weights depends on the number of parameters and the precision at which they are stored.
 
 As a rule of thumb, at half precision (BF16/FP16), you need 2GB of VRAM per 1b parameters plus 20% overhead for KV cache and CUDA/ROCm overhead. For [`Qwen3.6-35B-A3B`](https://huggingface.co/Qwen/Qwen3.6-35B-A3B):
-- **Weights:** $35\text{B parameters} \times 2\text{ bytes} = 70\text{GB}$. Note that for [Mixture-of-Experts (MoE)](https://huggingface.co/blog/moe-transformers) models, all the weights are loaded in VRAM, even though only a fraction (3B in our case) is active at a time.
-- **KV Cache & Overhead:** Adding the 20% buffer brings the total to $\approx 84\text{GB}$. Keep in mind that longer context size requires significantly more VRAM for KV cache.
+- **Weights:** 35B parameters × 2 bytes = **70GB**. Note that for [Mixture-of-Experts (MoE)](https://huggingface.co/blog/moe-transformers) models, all the weights are loaded in VRAM, even though only a fraction (3B in our case) is active at a time.
+- **KV Cache & Overhead:** Adding the 20% buffer brings the total to **≈84GB**. Keep in mind that longer context size requires significantly more VRAM for KV cache.
 
-Since a single LUMI GPU (GCD) has 64GB, one is not enough and we use 2 GPUs (128GB total). For a detailed breakdown of different models and [quantisation](https://bentoml.com/llm/model-preparation/llm-quantization) levels, you can use [this VRAM calculator](https://apxml.com/tools/vram-calculator).
+Since a single LUMI GCD has 64GB, one is not enough and we use 2 GCDs (128GB total). For a detailed breakdown of different models and [quantisation](https://bentoml.com/llm/model-preparation/llm-quantization) levels, you can use [this VRAM calculator](https://apxml.com/tools/vram-calculator).
 
 ## Step 2: Interact with the server
 Interacting with a running vLLM server requires you to be on the same compute node where the server (and its socket file) exists. We do this by 'jumping into' the compute node's shell, which is called **overlapping**.
@@ -153,30 +155,6 @@ srun singularity run \
 - `--num-prompts 100` truncates the long dataset to 100 entries. 
 
 ---
-
-## Deep dive: how things work
-### 1. Data movement on the GPU
-It is important to distinguish between two different types of data movement:
-- Initialisation (Disk → VRAM): Model weights move from the parallel file system into the GPU memory. This happens once at startup and takes several minutes. The weights must fit entirely in VRAM (assuming no offloading) and they stay there as long as the model is running.
-- Inference (VRAM → GPU Cores): During the Decode stage, the GPU must reload the model weights from VRAM into the compute cores for every single token generated.
-
-### 2. How "Memory" (Context) works
-If you look at `chat_with_LLM.py`, you will notice a list called `messages`. It is a common misconception that LLMs "remember" conversations naturally. In reality, LLMs are stateless, they treat every request as a brand new interaction, and it's the client's job to provide the 'memory'.
-- **The cost of context:** As the conversation grows longer, the "Prefill" stage takes longer and consumes more VRAM (to store the KV Cache). While Paged Attention makes this memory usage much more efficient, it doesn't make it free.
-- **Client-side management:** In our example, the memory is managed by the Python script. If you stop the script and restart it, the "memory" is cleared, even if the vLLM server is still running.
-
-### 3. Understanding throughput
-**Throughput** is the rate at which the model can process and generate tokens. Performance is split into two distinct stages, each bound by different hardware limits: 
-- **Prefill (Compute bound):** The model processes the entire input prompt (and history) in parallel. Since the GPU handles all input tokens at once, the bottleneck is the hardware's raw mathematical throughput (FLOPs).  Prefill throughput is how many **input** tokens the model can be **processing**.
-- **Decode (Memory bandwidth bound):** Tokens are generated one by one. For every single token produced, the GPU must reload all the model's weights from VRAM to GPU's compute cores. This makes performance dependent on Memory Bandwidth - how fast data can move - rather than how fast the GPU can calculate. Decode throughput is how many **output** tokens the model can be **generating**.
-
-### 4. Throughput: Sequential vs. Batched
-Why do we use asyncio and semaphores in `batched_inference_from_server.py`?
-- Sequential (Slow): If you send one prompt, wait for the answer, and then send the next, you don't utilise the full batching power of vLLM and your GPU sits almost idle.
-- Batched (Fast): By sending 256 prompts at once, vLLM’s **Continuous Batching** kicks in. While one request is in the "Decode" stage (generating a token), another can be in the "Prefill" stage. This saturates the GPU's memory bandwidth and drastically increases the number of tokens generated per second.
-
-> [!TIP]
-> If you want to see this in action, try running online batched inference with a semaphore of 1 (sequential) vs 256 (batched). This will only send one prompt at a time to the model, wait for the model's complete response, and only then send the next prompt. 
 
 ### Table of contents
 

@@ -18,11 +18,17 @@ export MIOPEN_USER_DB=$MIOPEN_DIR/config
 
 # We use the PyTorch container provided by the LUMI AI Factory Services, which contains vLLM.
 export SIF=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
+
+# Load the bindings to give LUMI containers access to the file system of the working directory
+module purge
 module use /appl/local/laifs/modules
 module load lumi-aif-singularity-bindings
 
 # Where to store the huge models. Point this to your project's scratch directory.
 export HF_HOME=/scratch/$SLURM_JOB_ACCOUNT/hf-cache/
+
+# Redirect all vLLM cache files from $HOME to scratch.
+export VLLM_CACHE_ROOT=/scratch/$SLURM_JOB_ACCOUNT/vllm-cache
 
 # Model selection
 MODEL_NAME="Qwen/Qwen3.6-35B-A3B"
