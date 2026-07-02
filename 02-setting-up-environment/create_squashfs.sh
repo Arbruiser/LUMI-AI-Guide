@@ -1,7 +1,7 @@
 #!/bin/bash
 module purge
-export BUILD_DIR=env-temp
-export SQUASHFS_NAME=venv.sqsh
+export BUILD_DIR=optuna-env-temp
+export SQUASHFS_NAME=optuna-env.sqsh
 export SIF=/appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260415_130625/lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif
 
 # creating the venv
@@ -10,7 +10,7 @@ mkdir $BUILD_DIR
 singularity exec -B "$BUILD_DIR":/user-software "$SIF" bash -c '
 set -euo pipefail
 python -m venv /user-software --system-site-packages
-/user-software/bin/python -m pip install lmdb
+/user-software/bin/python -m pip install optuna
 '
 
 # creating the squashfs file and removing the venv
