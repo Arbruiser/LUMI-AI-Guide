@@ -9,8 +9,8 @@ This chapter uses a pinned and date-stamped container `lumi-multitorch-full-u24r
 
 ## Why vLLM?
 vLLM is our recommended inference engine primarily due to two innovations:
-- **Paged Attention:** Efficiently manages KV (Key-Value) cache memory, allowing for much larger batch sizes, higher throughput and longer context windows.
-- **Continuous Batching:** Reduces latency by processing new requests as soon as old ones finish, rather than waiting for an entire batch to complete.
+- **Paged attention:** Efficiently manages KV (key-value) cache memory, allowing for much larger batch sizes, higher throughput and longer context windows.
+- **Continuous batching:** Reduces latency by processing new requests as soon as old ones finish, rather than waiting for an entire batch to complete.
 
 ## Inference workflows
 There are two ways to interact with a model:
@@ -52,11 +52,11 @@ sbatch start-vllm-server.sh
 - **MIOpen cache redirection:** We redirect the cache of MIOpen (AMD's library of deep-learning primitives) to a temporary directory to avoid collisions with other users on the same node. 
 - **Storage redirection:** LLM weights can exceed hundreds of gigabytes, far surpassing the 20GB limit of the default `home` directory. To handle this, the script sets the `HF_HOME` environment variable to your project’s `/scratch/` directory.
 - **vLLM cache redirection:** We redirect vLLM’s internal cache to your project’s `/scratch/` directory. This prevents the limited storage quota of your `$HOME` directory from being filled by temporary model artifacts.
-- **Private communication:** Instead of hosting the server on a standard network port, the script creates a **Unix Domain Socket** (.sock file). There are two benefits of this approach:
+- **Private communication:** Instead of hosting the server on a standard network port, the script creates a **Unix domain socket** (.sock file). There are two benefits of this approach:
     - **No port collisions:** It avoids the common "Address already in use" error that occurs if another user is using the same port on a shared node.
     - **Enhanced security:** The socket acts as a private gateway, removing the need for an API key. Access is restricted by file permissions and being on the same node (since only users with a job allocation on that node can access it), preventing other LUMI users from using your model instance.
 
-For a deeper dive into the performance and security benefits of Unix Domain Sockets, see [this technical overview](https://dev.to/kanywst/the-magic-of-sock-why-modern-infrastructure-relies-on-unix-domain-sockets-4ohl). 
+For a deeper dive into the performance and security benefits of Unix domain sockets, see [this technical overview](https://dev.to/kanywst/the-magic-of-sock-why-modern-infrastructure-relies-on-unix-domain-sockets-4ohl). 
 
 #### The execution command
 The core of the script is the `srun` command, which launches the container and initialises the server:
@@ -71,7 +71,7 @@ srun singularity run \
 **Flags explained:**
 - `vllm serve $MODEL_NAME` is the heart of the command that starts our vLLM server.
 - `--tensor-parallel-size` tells vLLM how many GCDs to split the model across. We set this to `$SLURM_GPUS_ON_NODE` so it automatically matches our `#SBATCH` request.
-- `--uds $SOCKET_FILE` creates the Unix Domain Socket we discussed earlier and connects the vLLM server to it.
+- `--uds $SOCKET_FILE` creates the Unix domain socket we discussed earlier and connects the vLLM server to it.
 - `--load-format runai_streamer` is a specialised loader that speeds up the transfer of model weights from the parallel file system to the GPUs, significantly reducing loading times for supported models.
 
 </details>
@@ -112,7 +112,7 @@ Interacting with a running vLLM server requires you to be on the same compute no
         singularity run $SIF python chat_with_LLM.py "Qwen/Qwen3.6-35B-A3B"
         ```
         > **ℹ️ NOTE: Why the `httpx` transport in [`chat_with_LLM.py`](chat_with_LLM.py)?**
-        > Standard LLM clients expect an `http://localhost:8000` address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
+        > Standard LLM clients expect an `http://localhost:8000` address. Because we use a Unix socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
 
     - **🚀 Option 2: Batched API inference.** Best for sending a lot of prompts, receiving the LLM's responses, and tweaking the prompts to run them again without reloading the model.
         ```bash
