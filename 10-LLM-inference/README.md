@@ -3,14 +3,16 @@ This chapter describes how to perform Large Language Model (LLM) inference on LU
 
 In this chapter, we will demonstrate how to run a vLLM server with [`Qwen3.6-35B-A3B`](https://huggingface.co/Qwen/Qwen3.6-35B-A3B), and how to use Python scripts for both interactive and batch inference.
 
-This chapter uses a persistent `lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif` container which includes vLLM that is optimised for running on LUMI. Note, the vLLM version may not be the absolute latest release as it takes time for our team to optimise and test the container.
+This chapter uses a pinned and date-stamped container `lumi-multitorch-full-u24r70f21m50t210-20260415_130625.sif` which includes vLLM that is optimised for running on LUMI. 
+
+> **💡 Note for Production:** For your own workloads, you can check `/appl/local/laifs/containers/` for a newer container. We recommend pinning to the latest specific date-stamped container rather than using the `latest` symlink to prevent unexpected updates from breaking your scripts.
 
 ## Why vLLM?
 vLLM is the recommended and most popular LLM engine choice primarily due to two innovations:
 - **Paged Attention:** Efficiently manages KV (Key-Value) cache memory, allowing for much larger batch sizes, higher throughput and longer context windows.
 - **Continuous Batching:** Reduces latency by processing new requests as soon as old ones finish, rather than waiting for an entire batch to complete.
 
-## Inference workflows:
+## Inference workflows
 There are two ways to interact with the models:
 | Workflow                  | Description                                                          | VRAM (GPU memory) & Loading Behavior                                                                                                          | Best for...                                                                 |
 |---------------------------|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
@@ -23,19 +25,17 @@ In this chapter, we use three distinct Python scripts to demonstrate different w
 - [`batched_inference_from_server.py`](batched_inference_from_server.py): send hundreds of prompts simultaneously to a running vLLM server for fast dataset processing or benchmarking.
 - [`batched_inference_from_Python.py`](batched_inference_from_Python.py): start vLLM directly in Python to load the model for fast dataset processing or benchmarking.
 
-# Workflow A: Server-Client Mode
+## Workflow A: Server-Client Mode
 Use this if you want to keep the model loaded and interact with it multiple times.
 
-## Step 1: Start the vLLM server
+### Step 1: Start the vLLM server
 The [`start-vllm-server.sh`](start-vllm-server.sh) script asks Slurm for resources (2 GCDs for 2h, 14 CPU cores and 120GB of RAM), handles the environment setup and launches the model. Update your project ID and submit:
 
 ``` bash
 sbatch start-vllm-server.sh
 ```
 
-Remember: on LUMI, one physical AMD MI250X GPU consists of two GCDs (Graphics Compute Dies), each having 64GB of VRAM. In Slurm, when you request `--gpus-per-node=2`, you are actually requesting 2 GCDs, which effectively is one GPU.
-
-### What the launch script does
+#### What the launch script does
 - **AI bindings:** We perform `module purge` and load `lumi-aif-singularity-bindings` to give LUMI containers access to the file system of the working directory.
 - **MIOpen Cache Redirection:** We redirect the cache of MIOpen (AMD's library of deep-learning primitives) to a temporary directory to avoid collisions with other users on the same node. 
 - **Storage Redirection:** LLM weights can exceed hundreds of gigabytes, far surpassing the 20GB limit of the default `home` directory. To handle this, the script sets the `HF_HOME` environment variable to your project’s `/scratch/` directory.
@@ -46,7 +46,7 @@ Remember: on LUMI, one physical AMD MI250X GPU consists of two GCDs (Graphics Co
 
 For a deeper dive into the performance and security benefits of Unix Domain Sockets, see [this technical overview](https://dev.to/kanywst/the-magic-of-sock-why-modern-infrastructure-relies-on-unix-domain-sockets-4ohl). 
 
-#### The execution command
+##### The execution command
 The core of the script is the `srun` command, which launches the container and initialises the server:
 ``` bash
 srun singularity run \
@@ -62,7 +62,7 @@ srun singularity run \
 - `--uds $SOCKET_FILE`: This creates the Unix Domain Socket we discussed earlier and connects the vLLM server to it.
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
 
-#### Note on the hardware requirements
+##### Note on the hardware requirements
 To run an LLM, the model must fit entirely in VRAM. The memory required for model weights depends on the number of parameters and the precision at which they are stored.
 
 As a rule of thumb, at half precision (BF16/FP16), you need 2GB of VRAM per 1b parameters plus 20% overhead for KV cache and CUDA/ROCm overhead. For [`Qwen3.6-35B-A3B`](https://huggingface.co/Qwen/Qwen3.6-35B-A3B):
@@ -71,19 +71,21 @@ As a rule of thumb, at half precision (BF16/FP16), you need 2GB of VRAM per 1b p
 
 Since a single LUMI GCD has 64GB, one is not enough and we use 2 GCDs (128GB total). For a detailed breakdown of different models and [quantisation](https://bentoml.com/llm/model-preparation/llm-quantization) levels, you can use [this VRAM calculator](https://apxml.com/tools/vram-calculator).
 
-## Step 2: Interact with the server
+### Step 2: Interact with the server
 Interacting with a running vLLM server requires you to be on the same compute node where the server (and its socket file) exists. We do this by 'jumping into' the compute node's shell, which is called **overlapping**.
 
-1.  **Enter the compute node's shell:** 
-    Find your job ID with `squeue --me`. As soon as your job status is `R` (Running), overlap into the allocated node:
-    ```bash
-    srun --overlap --jobid <slurm-job-id> --pty bash
-    ```
+1. **Monitor the startup:** 
+    Find your job ID with `squeue --me`. As soon as your job status is `R` (Running), the models will start loading into VRAM, which takes time. Check the logs and wait for the "Application startup complete" message:
 
-2. **Monitor the startup:** 
-    Loading models into VRAM takes time. Check the logs and wait for the "Application startup complete" message:
     ```bash
     tail -f slurm-<job-id>.out
+    ```
+
+2. **Enter the compute node's shell:** 
+    When the server is ready, overlap into the allocated compute node:
+
+    ```bash
+    srun --overlap --jobid <slurm-job-id> --pty bash
     ```
 3. Save the long path to the container in `SIF` variable and load the bindings to let the container 'see' the filesystem:
     ```bash
@@ -113,18 +115,17 @@ Interacting with a running vLLM server requires you to be on the same compute no
 
 ---
 
-# Workflow B: Offline Python Mode
+## Workflow B: Offline Python Mode
 Use this for high-throughput batch processing where you don't need interactive access to the model.
 
-We have provided a script called `run-offline-inference.sh` which asks Slurm for resources and executes the `batched_inference_from_Python.py` script inside the container.
+### Step 1: Submit the batch job
+The [`run-offline-inference.sh`](run-offline-inference.sh) script asks Slurm for resources, handles the environment setup and executes the `batched_inference_from_Python.py` script inside the container. Update your project ID and submit:
 
-## Step 1: Submit the batch job
-Update the script with your project ID and submit it:
 ```bash
 sbatch run-offline-inference.sh
 ```
 
-## Step 2: Check the results
+### Step 2: Check the results
 Since this is a batch job, you won't see the output in your terminal. You can check the job's progress by reading the output file generated by Slurm:
 ```bash
 tail -f slurm-<job-id>.out
@@ -136,7 +137,7 @@ Once the job finishes, the model's responses will be saved to `results.json`.
 ## Run an offline throughput test
 To understand how many tokens per second your setup can handle, you can run an offline benchmark. This sends a burst of requests to vLLM and measures the raw hardware input and output throughput without the overhead of an API server or data serialisation/deserialisation. This throughput test is a standalone job independent of the workflows above. Edit your project ID and run the following script:
 ```bash
-sbatch test-throughput-lumi2.sh
+sbatch test-throughput-lumi.sh
 ```
 
 This script is mostly identical to `start-vllm-server.sh`. The main difference lies in the following command:
