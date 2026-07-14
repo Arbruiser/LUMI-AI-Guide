@@ -58,7 +58,7 @@ sbatch start-vllm-server.sh
 
 For a deeper dive into the performance and security benefits of Unix Domain Sockets, see [this technical overview](https://dev.to/kanywst/the-magic-of-sock-why-modern-infrastructure-relies-on-unix-domain-sockets-4ohl). 
 
-##### The execution command
+#### The execution command
 The core of the script is the `srun` command, which launches the container and initialises the server:
 ``` bash
 srun singularity run \
@@ -109,14 +109,14 @@ Interacting with a running vLLM server requires you to be on the same compute no
         ```bash
         singularity run $SIF python chat_with_LLM.py "Qwen/Qwen3.6-35B-A3B"
         ```
-    > **ℹ️ NOTE: Why the `httpx` transport?**
+    > **ℹ️ NOTE: Why the `httpx` transport in [`chat_with_LLM.py`](chat_with_LLM.py)?**
     > Standard LLM clients expect an `http://localhost:8000` address. Because we use a Unix Socket for security and speed on LUMI, we use the `httpx.HTTPTransport(uds=socket_path)` to redirect the library's traffic into that `.sock` file.
 
     - **🚀 Option 2: Batched API Inference.** Best for sending a lot of prompts, receiving LLM responses, and tweaking the model to run the prompts again.     
         ```bash
         singularity run $SIF python batched_inference_from_server.py "Qwen/Qwen3.6-35B-A3B"
         ```    
-    *The results will be saved to `results.json`.*
+        *The results will be saved to `results.json`.*
 
 ---
 
@@ -143,6 +143,11 @@ Once the job finishes, the model's responses will be saved to `results.json`.
 To understand how many tokens per second your setup can handle, you can run an offline benchmark. This sends a burst of requests to vLLM and measures the raw hardware input and output throughput without the overhead of an API server or data serialisation/deserialisation. This throughput test is a standalone job independent of the workflows above. Edit your project ID and run the following script:
 ```bash
 sbatch test-throughput-lumi.sh
+```
+
+Once you submit the job, you can view the progress and the final throughput metrics (requests/s, total tokens/s, and output tokens/s) in the Slurm output file:
+```bash
+tail -f slurm-<job-id>.out
 ```
 
 This script is mostly identical to `start-vllm-server.sh`. The main difference lies in the following command:
