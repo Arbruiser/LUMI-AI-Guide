@@ -25,6 +25,15 @@ In this chapter, we use three distinct Python scripts to demonstrate different w
 - [`batched_inference_from_server.py`](batched_inference_from_server.py): send hundreds of prompts simultaneously to a running vLLM server for fast dataset processing or benchmarking.
 - [`batched_inference_from_Python.py`](batched_inference_from_Python.py): start vLLM directly in Python to load the model for fast dataset processing or benchmarking.
 
+## Hardware requirements
+To run an LLM, the model must fit entirely in VRAM. The memory required for model weights depends on the number of parameters and the precision at which they are stored.
+
+As a rule of thumb, at half precision (BF16/FP16), you need 2GB of VRAM per 1b parameters plus 20% overhead for KV cache and CUDA/ROCm overhead. For [`Qwen3.6-35B-A3B`](https://huggingface.co/Qwen/Qwen3.6-35B-A3B):
+- **Weights:** 35B parameters × 2 bytes = **70GB**. Note that for [Mixture-of-Experts (MoE)](https://huggingface.co/blog/moe-transformers) models, all the weights are loaded in VRAM, even though only a fraction (3B in our case) is active at a time.
+- **KV Cache & Overhead:** Adding the 20% buffer brings the total to **≈84GB**. Keep in mind that longer context size requires significantly more VRAM for KV cache.
+
+Since a single LUMI GCD has 64GB, one is not enough and we use 2 GCDs (128GB total). For a detailed breakdown of different models and [quantisation](https://bentoml.com/llm/model-preparation/llm-quantization) levels, you can use [this VRAM calculator](https://apxml.com/tools/vram-calculator).
+
 ## Workflow A: Server-Client Mode
 Use this if you want to keep the model loaded and interact with it multiple times.
 
@@ -34,6 +43,9 @@ The [`start-vllm-server.sh`](start-vllm-server.sh) script asks Slurm for resourc
 ``` bash
 sbatch start-vllm-server.sh
 ```
+
+<details>
+<summary><b>► Click here to see what the script is doing under the hood</b></summary>
 
 #### What the launch script does
 - **AI bindings:** We perform `module purge` and load `lumi-aif-singularity-bindings` to give LUMI containers access to the file system of the working directory.
@@ -62,14 +74,7 @@ srun singularity run \
 - `--uds $SOCKET_FILE`: This creates the Unix Domain Socket we discussed earlier and connects the vLLM server to it.
 - `--load-format runai_streamer`: This is a specialised loader that speeds up the transfer of supported model weights from the parallel file system to the GPUs. It helps significantly reduce the loading times for supported models.
 
-##### Note on the hardware requirements
-To run an LLM, the model must fit entirely in VRAM. The memory required for model weights depends on the number of parameters and the precision at which they are stored.
-
-As a rule of thumb, at half precision (BF16/FP16), you need 2GB of VRAM per 1b parameters plus 20% overhead for KV cache and CUDA/ROCm overhead. For [`Qwen3.6-35B-A3B`](https://huggingface.co/Qwen/Qwen3.6-35B-A3B):
-- **Weights:** 35B parameters × 2 bytes = **70GB**. Note that for [Mixture-of-Experts (MoE)](https://huggingface.co/blog/moe-transformers) models, all the weights are loaded in VRAM, even though only a fraction (3B in our case) is active at a time.
-- **KV Cache & Overhead:** Adding the 20% buffer brings the total to **≈84GB**. Keep in mind that longer context size requires significantly more VRAM for KV cache.
-
-Since a single LUMI GCD has 64GB, one is not enough and we use 2 GCDs (128GB total). For a detailed breakdown of different models and [quantisation](https://bentoml.com/llm/model-preparation/llm-quantization) levels, you can use [this VRAM calculator](https://apxml.com/tools/vram-calculator).
+</details>
 
 ### Step 2: Interact with the server
 Interacting with a running vLLM server requires you to be on the same compute node where the server (and its socket file) exists. We do this by 'jumping into' the compute node's shell, which is called **overlapping**.
