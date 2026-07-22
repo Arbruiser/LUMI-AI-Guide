@@ -144,7 +144,7 @@ Once the job finishes, the model's responses will be saved to `results.json`.
 ## Run an offline throughput test
 To understand how many tokens per second your setup can handle, you can run an offline benchmark. This sends a burst of requests to vLLM and measures the raw hardware input and output throughput without the overhead of an API server or data serialisation/deserialisation. This throughput test is a standalone job independent of the workflows above. Update your project ID and submit:
 ```bash
-sbatch test-throughput-lumi.sh
+sbatch test-throughput.sh
 ```
 
 Once you submit the job, you can view the progress and the final throughput metrics (requests/s, total tokens/s, and output tokens/s) in the Slurm output file:
